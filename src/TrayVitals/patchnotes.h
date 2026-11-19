@@ -1,6 +1,10 @@
 /* Patch notes shown in the "What's new" window (once after an update, and from the menu).
    Newest version first. Each version is one block: its header line, then lines starting with "\x2022 ". */
 static const wchar_t PATCH_NOTES[] =
+    L"1.10.1\r\n"
+    L"\x2022 The update popups (a new version is available, up to date, download problems) now always stay "
+    L"solid, like this window, so they're easy to read even with Transparency turned up.\r\n"
+    L"\r\n"
     L"1.10.0\r\n"
     L"\x2022 TraySense is now called TrayVitals. It's the same app with a name of its own, so it isn't mixed up "
     L"with the original TraySense it started from. Your settings, shortcuts and startup choice moved over.\r\n"

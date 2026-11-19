@@ -250,6 +250,7 @@ struct UIW {
     void *data;
     int dragging;
     int mx, my;                                /* last mouse position (client) */
+    int solid;                                 /* ignore the Transparency setting */
 };
 
 #define UI_CLASS L"TrayVitalsUI"
@@ -499,13 +500,14 @@ static void ui_card(UIW *u, RECT r, float rad, int shadow)
 {
     if (shadow) cv_shadow(&u->cv, (float)r.left, (float)r.top, (float)r.right, (float)r.bottom, rad, (float)S_(u, 14), u->t->dark ? 110 : 60);
     /* The What's new window is for reading, so it's always solid; Transparency is for the menu and popups. */
-    int a = u->kind == UK_NOTES ? 255 : ui_bg_alpha();
+    int a = (u->kind == UK_NOTES || u->solid) ? 255 : ui_bg_alpha();
     cv_rrect(&u->cv, (float)r.left, (float)r.top, (float)r.right, (float)r.bottom, rad, u->t->bg, a);
     cv_ring(&u->cv, (float)r.left, (float)r.top, (float)r.right, (float)r.bottom, rad, 1, u->t->border, 255);
 }
 
 /* ---------- popups (replace MessageBox / TaskDialog) ---------- */
 enum { UI_INFO, UI_WARN, UI_QUESTION, UI_UPDATE };
+#define UI_SOLID 0x100   /* add to the icon: always solid, whatever the Transparency setting (update popups) */
 typedef struct { int id; const wchar_t *text; } UIBTN;
 typedef struct { const wchar_t *head, *body; const UIBTN *b; int nb, icon, def; RECT card; } DLGDATA;
 #define DLG_CLOSE 8000
@@ -520,7 +522,7 @@ static void dlg_paint(UIW *u)
     ui_card(u, card, (float)S_(u, 10), 1);
     /* icon */
     static const wchar_t IC[4] = { 0xE946, 0xE7BA, 0xE9CE, 0xE896 };
-    COLORREF ic = d->icon == UI_WARN ? RGB(240, 168, 40) : t->accent;
+    COLORREF ic = (d->icon & 3) == UI_WARN ? RGB(240, 168, 40) : t->accent;
     int ix = card.left + pad, iy = card.top + pad, isz = S_(u, 36);
     cv_circle(&u->cv, ix + isz / 2.0f, iy + isz / 2.0f, isz / 2.0f, ic, 50);
     RECT ir = { ix, iy, ix + isz, iy + isz };
@@ -586,6 +588,7 @@ static int ui_dialog(const wchar_t *head, const wchar_t *body, const UIBTN *b, i
     UIW *u = ui_create(UK_DIALOG, WS_EX_TOOLWINDOW | WS_EX_TOPMOST);
     if (!u) return 0;
     g_uiDialog = u->hwnd;
+    u->solid = (icon & UI_SOLID) != 0;
     u->data = &d; u->paint = dlg_paint; u->click = dlg_click; u->key = dlg_key; u->nchit = dlg_nchit;
     /* size: fixed width, height from the text */
     int sh = S_(u, 16), pad = S_(u, 24), W = S_(u, 460) + 2 * sh;
@@ -603,7 +606,7 @@ static int ui_dialog(const wchar_t *head, const wchar_t *body, const UIBTN *b, i
     POINT p; GetCursorPos(&p);
     RECT wa = ui_work(p);
     ui_resize(u, wa.left + (wa.right - wa.left - W) / 2, wa.top + (wa.bottom - wa.top - H) / 2 - S_(u, 40), W, H);
-    MessageBeep(icon == UI_WARN ? MB_ICONWARNING : MB_ICONINFORMATION);
+    MessageBeep((icon & 3) == UI_WARN ? MB_ICONWARNING : MB_ICONINFORMATION);
     ui_show(u, 1);
     int r = ui_run(u);
     g_uiDialog = NULL;

@@ -2335,7 +2335,7 @@ static void upd_prompt(void)
     body[399] = 0;
     UIBTN b[3] = { { 100, g_upd.url[0] ? L"Update now" : L"Open download page" },
                    { 101, L"Later" }, { 102, L"Skip this version" } };
-    int c = ui_dialog(head, body, b, 3, UI_UPDATE);
+    int c = ui_dialog(head, body, b, 3, UI_UPDATE | UI_SOLID);
     if (c == 100) upd_now();
     else if (c == 102)
         RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"UpdateSkip", REG_SZ, g_upd.ver, (lstrlenW(g_upd.ver) + 1) * sizeof(wchar_t));
@@ -2359,7 +2359,7 @@ static void upd_run(const wchar_t *file)
     e.lpVerb = L"runas"; e.lpFile = file; e.lpParameters = L"/update"; e.nShow = SW_SHOWNORMAL;
     if (ShellExecuteExW(&e)) { DestroyWindow(g_wnd); return; }   /* setup replaces this copy and restarts it */
     if (GetLastError() != ERROR_CANCELLED)
-        ui_msg(L"Couldn't start the TrayVitals update", NULL, UI_WARN);
+        ui_msg(L"Couldn't start the TrayVitals update", NULL, UI_WARN | UI_SOLID);
 }
 
 static void upd_done(UPDINFO *u)
@@ -2371,7 +2371,7 @@ static void upd_done(UPDINFO *u)
                         u->result == UPD_BADHASH
                             ? L"The downloaded file didn't match its checksum, so it was not run. Open the download page instead?"
                             : L"Check your internet connection. Open the download page instead?",
-                        L"Open download page", L"Close", UI_WARN))
+                        L"Open download page", L"Close", UI_WARN | UI_SOLID))
             open_releases();
     } else {
         if (u->result != UPD_FAILED) {
@@ -2391,7 +2391,7 @@ static void upd_done(UPDINFO *u)
                 ui_msg(u->result == UPD_CURRENT ? L"TrayVitals is up to date" : L"Couldn't check for updates",
                        u->result == UPD_CURRENT ? L"You have the latest version, " TV_VERSION L"."
                                                 : L"Check your internet connection and try again.",
-                       u->result == UPD_CURRENT ? UI_INFO : UI_WARN);
+                       (u->result == UPD_CURRENT ? UI_INFO : UI_WARN) | UI_SOLID);
         }
         if (u->job == UPD_AUTO) upd_schedule(u->result == UPD_FAILED ? 60 * 60 * 1000 : 60 * 1000);
     }
@@ -2924,8 +2924,8 @@ static void preview_popups(void)
     UIBTN up[3] = { { 100, L"Update now" }, { 101, L"Later" }, { 102, L"Skip this version" } };
     if (!ui_dialog(L"TrayVitals 1.11.0 is available",
                    L"You have version " TV_VERSION L".\n\nUpdating takes a few seconds and keeps your settings. "
-                   L"Windows will ask for permission, then TrayVitals restarts.", up, 3, UI_UPDATE)) return;
-    ui_msg(L"TrayVitals is up to date", L"You have the latest version, " TV_VERSION L".", UI_INFO);
+                   L"Windows will ask for permission, then TrayVitals restarts.", up, 3, UI_UPDATE | UI_SOLID)) return;
+    ui_msg(L"TrayVitals is up to date", L"You have the latest version, " TV_VERSION L".", UI_INFO | UI_SOLID);
     UIBTN tb[2] = { { 100, L"Open taskbar settings" }, { 101, L"Switch back to big labels" } };
     if (!ui_dialog(L"Windows is hiding TrayVitals' tray icon",
                    L"Windows put TrayVitals' icon in the hidden icons menu (^ next to the clock) instead of on the "
@@ -2936,7 +2936,7 @@ static void preview_popups(void)
                 L"a small, signed, open-source driver. Windows will ask for permission.",
                 L"Install and turn on", L"Not now", UI_QUESTION)) return;
     ui_ask(L"Couldn't download the update", L"Check your internet connection. Open the download page instead?",
-           L"Open download page", L"Close", UI_WARN);
+           L"Open download page", L"Close", UI_WARN | UI_SOLID);
 }
 
 static LRESULT CALLBACK barproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
