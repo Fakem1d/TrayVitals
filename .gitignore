@@ -1,4 +1,14 @@
-# build output
+# Files git should NOT upload. Only things the build makes are listed here; all source code,
+# pictures, docs and settings are part of the repo. Change this list to suit your own fork.
+
+# Build results: made by build.sh, so they don't belong in the source
 *.exe
 *.res
 *.sha256
+
+# The PawnIO installer: a third-party file, downloaded by build.sh from PawnIO's official release
+# and checked against its SHA-256 (see THIRD_PARTY.md), so it isn't stored here
+src/installer/pawnio/
+
+# Previews that tools/make-icon.ps1 writes next to itself
+tools/*.png
