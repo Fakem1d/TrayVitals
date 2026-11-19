@@ -1,0 +1,98 @@
+name: Report a problem
+description: Something in TrayVitals doesn't work or shows the wrong number.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! The more of the questions below you can answer, the faster it can be fixed.
+        **Found a security problem?** Please don't post it here; report it privately [here](https://github.com/Fakem1d/TrayVitals/security/advisories/new).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect to see instead?
+      placeholder: "Example: GPU power shows 0 W while a game is running. I expected around 150 W."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be seen again?
+      description: The steps that lead to the problem, if you know them.
+      placeholder: |
+        1. Turn on "GPU power" in the menu
+        2. Start a game
+        3. ...
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of TrayVitals?
+      options:
+        - A reading (CPU, GPU, RAM, VRAM, SSD, temperatures, power)
+        - The labels on the taskbar
+        - The tray icon
+        - The menu
+        - Updates
+        - Setup / uninstall
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: TrayVitals version
+      description: "Right-click TrayVitals → What's new: the version is at the top."
+      placeholder: "1.11.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: windows
+    attributes:
+      label: Windows version
+      options:
+        - Windows 11
+        - Windows 10
+    validations:
+      required: true
+
+  - type: input
+    id: cpu
+    attributes:
+      label: Processor (CPU)
+      description: "Task Manager → Performance → CPU shows its name."
+      placeholder: "AMD Ryzen 7 7800X3D"
+
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card (GPU)
+      description: "Task Manager → Performance → GPU shows its name. Especially helpful for problems with GPU power on AMD Radeon cards."
+      placeholder: "AMD Radeon RX 7800 XT"
+
+  - type: dropdown
+    id: menu
+    attributes:
+      label: Menu style
+      options:
+        - Modern
+        - Classic
+        - Not sure
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: A screenshot often says more than words. Drag it into this box.
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Other programs that might be involved (for example taskbar tools like ExplorerPatcher, Windhawk or StartAllBack), more than one monitor, and so on.

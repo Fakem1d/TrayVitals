@@ -97,6 +97,12 @@ TrayVitals checks this page for a new release once a day. When there's one, it a
 
 You can also check right away, or turn the daily check off, from the menu (**Updates**).
 
+## Report a problem or suggest an idea
+
+Something not working, or a reading that looks wrong? [Open an issue](https://github.com/Fakem1d/TrayVitals/issues/new/choose) and pick **Report a problem** or **Suggest an idea**. A short form asks for the details that help most, like your TrayVitals version, Windows version and graphics card. Especially welcome: how **GPU power on AMD Radeon** cards looks on yours, since that's new.
+
+Security problems: please report them privately instead, see [SECURITY.md](SECURITY.md).
+
 ## Uninstall
 
 Go to **Settings > Apps > Installed apps**, find **TrayVitals**, and click **Uninstall**. This removes everything: the program, its shortcuts, its startup entry, its settings and, if you choose, the PawnIO driver.

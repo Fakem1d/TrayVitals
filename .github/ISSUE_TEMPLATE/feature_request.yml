@@ -1,0 +1,31 @@
+name: Suggest an idea
+description: A new feature or a change that would make TrayVitals better.
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! TrayVitals tries to stay small and light, so tell us what you'd like and why it would help you.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      placeholder: "Example: show network upload and download speed on the taskbar."
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?
+      description: What are you trying to do that TrayVitals can't do yet?
+    validations:
+      required: true
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Sketches, screenshots of something similar, or how you'd like it to look.

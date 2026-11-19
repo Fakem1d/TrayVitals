@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem privately
+    url: https://github.com/Fakem1d/TrayVitals/security/advisories/new
+    about: Please don't post security problems publicly; report them here instead.
+  - name: Download TrayVitals
+    url: https://github.com/Fakem1d/TrayVitals/releases/latest
+    about: The latest version and its installer.
