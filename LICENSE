@@ -1,14 +1,17 @@
-TraySense - license
+TrayVitals - license
 ===================
 
-TraySense is a fork of TraySense by DMTWEAKS (https://github.com/DMTWEAKS/traysense).
+TrayVitals is a fork of TraySense by DMTWEAKS (https://github.com/DMTWEAKS/traysense).
 It has two licenses, one for each part:
 
 1. MAIN LICENSE - the original TraySense, MIT License (at the end of this file).
-   The original code as published in DMTWEAKS/traysense stays under its MIT License,
-   exactly as it was published there. That license is reproduced below because the
-   MIT License requires its notice to be kept with the original code; it may not be
-   changed, and it covers that original code only.
+   This fork is based on the original code as DMTWEAKS published it on 18 November 2026
+   under the MIT License, before the original project was relicensed under AGPL-3.0 on
+   19 November 2026 (commit a11eb84 in DMTWEAKS/traysense). That original code stays under
+   its MIT License, exactly as it was published. Nothing from the later, AGPL-3.0 versions
+   of the original is used in this fork.
+   The MIT License is reproduced below because it requires its notice to be kept with
+   the original code; it may not be changed, and it covers that original code only.
 
 2. EVERYTHING ADDED OR CHANGED IN THIS FORK - PolyForm Noncommercial License 1.0.0
    (see LICENSE-NONCOMMERCIAL.md, or https://polyformproject.org/licenses/noncommercial/1.0.0).
@@ -16,7 +19,7 @@ It has two licenses, one for each part:
    with version 1.10.0: among others the installer, the menus, themes and popups (ui.h),
    automatic updates, the extra sensors, and the documentation and pictures.
 
-   Required Notice: Copyright (c) 2026 Fakem1d (https://github.com/Fakem1d/Traysense)
+   Required Notice: Copyright (c) 2026 Fakem1d (https://github.com/Fakem1d/TrayVitals)
 
 Which license applies
 ---------------------
@@ -25,8 +28,8 @@ Which license applies
     no rights at all in anything this fork added or changed, and it does not make this
     fork, or any program, installer or source code that contains any part of it,
     available under MIT.
-  - TraySense as distributed from this repository - its source code, TraySense.exe and
-    TraySense-Setup.exe, version 1.10.0 and later - contains work covered by the
+  - TrayVitals as distributed from this repository - its source code, TrayVitals.exe and
+    TrayVitals-Setup.exe, version 1.10.0 and later - contains work covered by the
     PolyForm Noncommercial License. Anyone who copies, changes, shares or uses it must
     follow that license for it. Because you need permission for every part of a
     program in order to sell it, and the PolyForm Noncommercial License does not give
@@ -38,17 +41,17 @@ Which license applies
 
 What this means, in short (the license texts are what count):
 
-  - You may use TraySense for free, change it, build it yourself and share it,
+  - You may use TrayVitals for free, change it, build it yourself and share it,
     for any noncommercial purpose: personal use, hobby projects, study, schools,
     charities and public institutions.
-  - You may not sell TraySense or a version of it, put it behind a paywall, bundle it
+  - You may not sell TrayVitals or a version of it, put it behind a paywall, bundle it
     with something you sell, or use it in a commercial product or service, unless
     Fakem1d gives you written permission.
   - When you share it, keep this file, LICENSE-NONCOMMERCIAL.md and the notices.
   - Versions released before 1.10.0 were published under the MIT License alone, and
     the copies people already got stay under MIT.
 
-The PawnIO driver and modules that TraySense uses are not covered by either license;
+The PawnIO driver and modules that TrayVitals uses are not covered by either license;
 they are by namazso, under their own licenses (see THIRD_PARTY.md).
 
 
