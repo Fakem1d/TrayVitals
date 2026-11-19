@@ -4,9 +4,11 @@ TraySense - license
 TraySense is a fork of TraySense by DMTWEAKS (https://github.com/DMTWEAKS/traysense).
 It has two licenses, one for each part:
 
-1. MAIN LICENSE - the original TraySense, MIT License (below).
-   The original code from DMTWEAKS/traysense stays under its MIT License, exactly as
-   it was published there. Anyone may use that original code under MIT.
+1. MAIN LICENSE - the original TraySense, MIT License (at the end of this file).
+   The original code as published in DMTWEAKS/traysense stays under its MIT License,
+   exactly as it was published there. That license is reproduced below because the
+   MIT License requires its notice to be kept with the original code; it may not be
+   changed, and it covers that original code only.
 
 2. EVERYTHING ADDED OR CHANGED IN THIS FORK - PolyForm Noncommercial License 1.0.0
    (see LICENSE-NONCOMMERCIAL.md, or https://polyformproject.org/licenses/noncommercial/1.0.0).
@@ -15,6 +17,24 @@ It has two licenses, one for each part:
    automatic updates, the extra sensors, and the documentation and pictures.
 
    Required Notice: Copyright (c) 2026 Fakem1d (https://github.com/Fakem1d/Traysense)
+
+Which license applies
+---------------------
+
+  - The MIT License below grants rights ONLY in the original DMTWEAKS code. It grants
+    no rights at all in anything this fork added or changed, and it does not make this
+    fork, or any program, installer or source code that contains any part of it,
+    available under MIT.
+  - TraySense as distributed from this repository - its source code, TraySense.exe and
+    TraySense-Setup.exe, version 1.10.0 and later - contains work covered by the
+    PolyForm Noncommercial License. Anyone who copies, changes, shares or uses it must
+    follow that license for it. Because you need permission for every part of a
+    program in order to sell it, and the PolyForm Noncommercial License does not give
+    that permission, neither this fork nor any version based on it may be sold or used
+    commercially, even though the original code inside it is under MIT.
+  - Someone who wants to sell software under MIT can only do that with the original
+    DMTWEAKS code alone, taken from the original repository, with none of this fork's
+    work in it.
 
 What this means, in short (the license texts are what count):
 
@@ -33,7 +53,9 @@ they are by namazso, under their own licenses (see THIRD_PARTY.md).
 
 
 -------------------------------------------------------------------------------
-MIT License (the original TraySense)
+MIT License - applies ONLY to the original TraySense code by DMTWEAKS
+(https://github.com/DMTWEAKS/traysense). Kept here unchanged, as the MIT License
+requires. It does not apply to this fork's additions; see "Which license applies".
 -------------------------------------------------------------------------------
 
 Copyright (c) 2026 TraySense contributors

@@ -7,7 +7,7 @@
 
 ![TraySense labels on the taskbar](screenshots/taskbar-labels.png)
 
-It's small and light: one ~160 KB program written in plain C. It only redraws when a number changes, and it stops checking while the screen is off.
+It's small and light: one program of about 260 KB, written in plain C. It only redraws when a number changes, and it stops checking while the screen is off.
 
 ### [⬇ Download TraySense-Setup.exe](https://github.com/Fakem1d/Traysense/releases/latest/download/TraySense-Setup.exe)
 
@@ -25,7 +25,7 @@ Works on Windows 10 and Windows 11 (64-bit).
 | RAM usage | Every PC |
 | GPU usage | Every graphics card (NVIDIA, AMD, Intel) |
 | GPU temperature | Dedicated graphics cards |
-| GPU power (watts) | NVIDIA graphics cards |
+| GPU power (watts) | NVIDIA and AMD Radeon graphics cards (Radeon support is new in 1.10.0) |
 | VRAM usage | Every graphics card |
 | SSD temperature | The drive Windows is installed on |
 
@@ -36,6 +36,8 @@ Turn any reading on or off from the menu.
 - **Big labels on the taskbar.** They fit between your app buttons and the tray, never cover anything, and switch to a smaller layout when space runs short.
 - **Or one small tray icon.** It shows the reading you pick, and hovering it lists all of them.
 - **Any display.** Show the labels on your main monitor or any other one. Align them left, center or right, and nudge them into place.
+- **Your look.** Seven themes (Follow Windows, Light, Dark, Midnight, Graphite, Forest, Sakura), see-through menus and popups, and adjustable label opacity.
+- **Two menu styles.** TraySense's own modern menu, or Windows' standard one. Pick one when installing and switch any time.
 - **Automatic updates.** TraySense checks once a day and tells you when a new version is out, but never over a full-screen game or video. One click updates it, with your settings kept.
 - **Patch notes** open after every update, so you know what changed.
 - **Starts with Windows** if you want it to.
@@ -45,26 +47,34 @@ Turn any reading on or off from the menu.
 
 1. Download **[TraySense-Setup.exe](https://github.com/Fakem1d/Traysense/releases/latest/download/TraySense-Setup.exe)** from the [latest release](https://github.com/Fakem1d/Traysense/releases/latest).
 2. Open it. If Windows shows **"Windows protected your PC"**, click **More info**, then **Run anyway**. This happens because TraySense isn't signed with a paid certificate; it's not a virus warning.
-3. Pick where to install it and whether you want a desktop shortcut and start with Windows, then click **Install**.
+3. Setup walks you through four short steps: **Welcome**, **Menu style**, **Options** (desktop shortcut, start with Windows, CPU temperature support) and **Install** (where to put it). Use **Back** to change anything before you click **Install**.
 4. TraySense starts right away. Right-click it to choose what it shows.
+
+<img src="screenshots/setup-menu-style.png" alt="Setup: choosing a menu style" width="560">
 
 CPU temperature and CPU power need a small, signed, open-source driver called [PawnIO](https://github.com/namazso/PawnIO.Setup) (the same one LibreHardwareMonitor uses). The installer includes it, so those readings work right after installing.
 
 ## How to use it
 
-Right-click the labels or the tray icon to open the menu:
+Right-click the labels or the tray icon to open the menu. There are two styles; switch between them with **Menu style** in either menu.
 
-<img src="screenshots/menu.png" alt="TraySense menu" width="243">
-
-| Menu item | What it does |
+| Modern | Classic |
 |---|---|
-| CPU usage … SSD temperature | Turn each reading on or off |
+| <img src="screenshots/menu-modern.png" alt="Modern menu" width="300"> | <img src="screenshots/menu-classic.png" alt="Classic menu" width="260"> |
+| TraySense's own menu. It stays open while you change settings, so you see each change right away. Follows the theme and transparency. | Windows' standard menu, in light or dark. Keeps it simple: themes and transparency are set from the modern menu. |
+
+| Setting | What it does |
+|---|---|
+| Readings | Turn each reading on or off. An amber dot means TraySense can't find that sensor on your PC. |
 | Big labels on taskbar | Switch between taskbar labels and a single tray icon |
-| Move left / Move right / Reset position | Nudge the labels |
-| Align | Put the labels on the left, center or right of the free space |
-| Show on display | Show the labels on another monitor |
-| Small icon shows | Pick which reading the tray icon shows |
-| Refresh rate | How often readings update: 1, 2 or 5 seconds (5 uses the least power) |
+| Align / Nudge | Put the labels on the left, center or right of the free space, and move them a little |
+| Display | Show the labels on another monitor |
+| Opacity | How see-through the taskbar labels are |
+| Small icon | Which reading the tray icon shows |
+| Theme | Follow Windows, or pick one of six themes |
+| Transparency | How see-through the menu and popups are (the What's new window always stays solid) |
+| Menu style | Modern or Classic |
+| Refresh | How often readings update: 1, 2 or 5 seconds (5 uses the least power) |
 | Start with Windows | Start TraySense when you sign in |
 | Updates | Check for a new version now, or turn the daily check off |
 | What's new | Patch notes for every version |
@@ -83,7 +93,7 @@ TraySense checks this page for a new release once a day. When there's one, it as
 
 <img src="screenshots/whats-new.png" alt="What's new window" width="566">
 
-You can also check right away, or turn the daily check off, from **right-click > Updates**.
+You can also check right away, or turn the daily check off, from the menu (**Updates**).
 
 ## Uninstall
 
@@ -91,19 +101,75 @@ Go to **Settings > Apps > Installed apps**, find **TraySense**, and click **Unin
 
 ## Privacy
 
-TraySense doesn't collect or send any data about you or your PC. The only time it goes online is the daily update check, which asks GitHub for the latest version number of this project. You can turn that off in **right-click > Updates**.
+TraySense doesn't collect or send any data about you or your PC. The only time it goes online is the daily update check, which asks GitHub for the latest version number of this project. You can turn that off from the menu.
+
+## Build it yourself
+
+All of TraySense is in this repo. Anyone can build it, change it and share their own version for free, as long as it's not sold or used commercially (see [License](#license)).
+
+**You need:** [w64devkit](https://github.com/skeeto/w64devkit) on Windows (a free, portable compiler; nothing to install), or MinGW-w64 on Linux (`sudo apt install gcc-mingw-w64-x86-64`).
+
+1. Download this repo (**Code > Download ZIP**) and unzip it, or `git clone` it.
+2. Open `w64devkit.exe`, go to the folder (`cd C:/path/to/Traysense`) and run:
+   ```
+   sh build.sh
+   ```
+3. You get `TraySense-Setup.exe` in the same folder (and `src/TraySense-main/TraySense.exe`, the program on its own).
+
+`build.sh` downloads the official PawnIO installer the first time and stops if its SHA-256 doesn't match (see [THIRD_PARTY.md](THIRD_PARTY.md)).
+
+### Build options
+
+Pass them in `EXTRA_CFLAGS`:
+
+| Option | What it does |
+|---|---|
+| `-DTS_UPDATE_REPO=L""` | No update checks at all |
+| `-DTS_UPDATE_REPO=L"you/your-fork"` | Check your own GitHub repo for updates (releases tagged like `v1.10.0`, with `TraySense-Setup.exe` attached) |
+| `-DTS_MENU_MODERN=0` | Windows' standard menu by default (people can still switch) |
+
+For example:
+
+```
+EXTRA_CFLAGS='-DTS_UPDATE_REPO=L"you/your-fork"' sh build.sh
+```
+
+### Trying a change without touching your installed TraySense
+
+`src/TraySense-main/preview.c` builds a preview copy that runs next to the installed one, with its own settings, and never touches startup, updates or Windows' tray settings. Its menu has **Preview the popups**, to see every popup once. How to build it is at the top of that file.
+
+### What's where
+
+| File | What it is |
+|---|---|
+| `src/version.h` | Version number and the update repo. Change the version here and add a section at the top of `patchnotes.h`. |
+| `src/TraySense-main/traysense.c` | The program: sensors, taskbar labels, tray icon, menu commands, updates |
+| `src/TraySense-main/ui.h` | The look: themes, transparency, the modern menu, popups and the What's new window |
+| `src/TraySense-main/patchnotes.h` | The text of the What's new window |
+| `src/installer/setup.c`, `setup.rc` | The installer and uninstaller (the four setup pages) |
+| `src/installer/images/` | The menu pictures shown in setup |
+| `.github/workflows/build.yml` | How GitHub builds each release |
+
+### Making a release (for this repo)
+
+Set the version in `src/version.h`, add the patch notes, push, then publish a GitHub release tagged with the same version (like `v1.10.0`). GitHub builds the installer from that code and attaches it with a checksum and a build attestation. See [SECURITY.md](SECURITY.md).
 
 ## Security and open source
 
-All of the code is in [`src`](src). Every release is built by GitHub from that code, in public, and comes with a checksum and a build attestation you can check. [SECURITY.md](SECURITY.md) shows how, explains what TraySense does as administrator, and how to report a problem. [THIRD_PARTY.md](THIRD_PARTY.md) lists the outside parts it uses.
-
-To build it yourself, run `sh build.sh` in [w64devkit](https://github.com/skeeto/w64devkit).
+Every release is built by GitHub from the code in this repo, in public, and comes with a checksum and a build attestation you can check. [SECURITY.md](SECURITY.md) shows how, explains what TraySense does as administrator, and how to report a problem. [THIRD_PARTY.md](THIRD_PARTY.md) lists the outside parts it uses.
 
 ## Credits
 
 - Based on [TraySense by DMTWEAKS](https://github.com/DMTWEAKS/traysense) (MIT License).
 - CPU sensors are read through [PawnIO](https://github.com/namazso/PawnIO.Setup) by namazso and its [modules](https://github.com/namazso/PawnIO.Modules) (LGPL-2.1).
+- AMD Radeon GPU power uses the AMD Display Library, following AMD's [ADL SDK](https://github.com/GPUOpen-LibrariesAndSDKs/display-library) (MIT).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+TraySense is free for any noncommercial use: use it, change it, build it and share it.
+**Selling it, or using it in a commercial product or service, isn't allowed** without written permission.
+
+- The original TraySense by DMTWEAKS stays under its **MIT License** (the main license).
+- Everything added or changed in this fork, from version 1.10.0 on, is under the **[PolyForm Noncommercial License 1.0.0](LICENSE-NONCOMMERCIAL.md)**.
+
+See [LICENSE](LICENSE) for the details. Versions before 1.10.0 were released under MIT alone.
