@@ -1,7 +1,42 @@
-MIT License
+TraySense - license
+===================
+
+TraySense is a fork of TraySense by DMTWEAKS (https://github.com/DMTWEAKS/traysense).
+It has two licenses, one for each part:
+
+1. MAIN LICENSE - the original TraySense, MIT License (below).
+   The original code from DMTWEAKS/traysense stays under its MIT License, exactly as
+   it was published there. Anyone may use that original code under MIT.
+
+2. EVERYTHING ADDED OR CHANGED IN THIS FORK - PolyForm Noncommercial License 1.0.0
+   (see LICENSE-NONCOMMERCIAL.md, or https://polyformproject.org/licenses/noncommercial/1.0.0).
+   This covers all changes and additions made in this repository by Fakem1d, starting
+   with version 1.10.0: among others the installer, the menus, themes and popups (ui.h),
+   automatic updates, the extra sensors, and the documentation and pictures.
+
+   Required Notice: Copyright (c) 2026 Fakem1d (https://github.com/Fakem1d/Traysense)
+
+What this means, in short (the license texts are what count):
+
+  - You may use TraySense for free, change it, build it yourself and share it,
+    for any noncommercial purpose: personal use, hobby projects, study, schools,
+    charities and public institutions.
+  - You may not sell TraySense or a version of it, put it behind a paywall, bundle it
+    with something you sell, or use it in a commercial product or service, unless
+    Fakem1d gives you written permission.
+  - When you share it, keep this file, LICENSE-NONCOMMERCIAL.md and the notices.
+  - Versions released before 1.10.0 were published under the MIT License alone, and
+    the copies people already got stay under MIT.
+
+The PawnIO driver and modules that TraySense uses are not covered by either license;
+they are by namazso, under their own licenses (see THIRD_PARTY.md).
+
+
+-------------------------------------------------------------------------------
+MIT License (the original TraySense)
+-------------------------------------------------------------------------------
 
 Copyright (c) 2026 TraySense contributors
-Copyright (c) 2026 Fakem1d
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +55,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-(The PawnIO driver and modules that TraySense uses are not covered by this license;
-they are by namazso, under their own licenses: https://github.com/namazso/PawnIO.Modules)
