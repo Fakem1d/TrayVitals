@@ -142,17 +142,26 @@ EXTRA_CFLAGS='-DTS_UPDATE_REPO=L"you/your-fork"' sh build.sh
 
 ### What's where
 
+Everything TrayVitals is made from is in this repo, including the hidden files whose names start with a dot. Every file can be read and changed.
+
 | File | What it is |
 |---|---|
 | `src/version.h` | Version number and the update repo. Change the version here and add a section at the top of `patchnotes.h`. |
 | `src/TrayVitals/trayvitals.c` | The program: sensors, taskbar labels, tray icon, menu commands, updates |
 | `src/TrayVitals/ui.h` | The look: themes, transparency, the modern menu, popups and the What's new window |
 | `src/TrayVitals/patchnotes.h` | The text of the What's new window |
-| `src/installer/setup.c`, `setup.rc` | The installer and uninstaller (the four setup pages) |
-| `src/installer/images/` | The menu pictures shown in setup |
+| `src/TrayVitals/trayvitals.rc`, `trayvitals.manifest` | The program's icon, version info and Windows settings (DPI, visual style) |
+| `src/TrayVitals/preview.c` | Builds a preview copy for trying changes (see above) |
+| `src/TrayVitals/pawnio/` | The signed PawnIO modules that read CPU temperature (see [THIRD_PARTY.md](THIRD_PARTY.md)) |
 | `src/TrayVitals/trayvitals.ico` | The icon. `tools/make-icon.ps1` draws it; change the script and run it to make your own. |
-| `.github/workflows/build.yml` | How GitHub builds each release |
-
+| `src/installer/setup.c`, `setup.rc`, `setup.h`, `setup.manifest` | The installer and uninstaller (the four setup pages) |
+| `src/installer/images/` | The menu pictures shown in setup |
+| `tools/make-icon.ps1` | Draws the icon (PowerShell, no extra software needed) |
+| `build.sh` | Builds everything (see [Build it yourself](#build-it-yourself)) |
+| `.github/workflows/build.yml` | How GitHub builds each release, step by step. In a fork, change it freely, for example to drop the extra `TraySense-Setup.exe` copy. |
+| `.gitignore` | Which files git leaves out: only build results and the downloaded PawnIO installer. Each line is explained in the file. |
+| `screenshots/` | The pictures in this README |
+| `LICENSE`, `LICENSE-NONCOMMERCIAL.md`, `SECURITY.md`, `THIRD_PARTY.md` | License, security notes and third-party parts |
 ### Making a release (for this repo)
 
 Set the version in `src/version.h`, add the patch notes, push, then publish a GitHub release tagged with the same version (like `v1.10.0`). GitHub builds the installer from that code and attaches it with a checksum and a build attestation. See [SECURITY.md](SECURITY.md).

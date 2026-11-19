@@ -1,9 +1,14 @@
 #!/bin/sh
-# Builds TraySense.exe and the installer, TraySense-Setup.exe, which has TraySense.exe inside.
+# Builds TrayVitals.exe and the installer, TrayVitals-Setup.exe, which has TrayVitals.exe inside.
 #
 # Needs MinGW-w64 (gcc + windres). On Windows the easiest is w64devkit
 # (https://github.com/skeeto/w64devkit): open w64devkit.exe, go to this folder, run "sh build.sh".
 # GitHub builds every release with this same script (see .github/workflows/build.yml).
+#
+# Your own build options go in EXTRA_CFLAGS, for example:
+#   EXTRA_CFLAGS='-DTV_UPDATE_REPO=L""' sh build.sh                 no update checks
+#   EXTRA_CFLAGS='-DTV_UPDATE_REPO=L"you/your-fork"' sh build.sh    updates from your own fork
+#   EXTRA_CFLAGS='-DTV_MENU_MODERN=0' sh build.sh                    Windows' menu by default
 set -e
 cd "$(dirname "$0")"
 
@@ -23,19 +28,19 @@ if [ ! -f "$PAWN" ]; then
 fi
 echo "$PAWN_SHA256  $PAWN" | sha256sum -c -
 
-# 1. TraySense.exe
-cd src/TraySense-main
-"$WINDRES" traysense.rc -O coff -o traysense.res
-"$CC" -Os -s -mwindows -Wall -ffunction-sections -fdata-sections -Wl,--gc-sections \
-      traysense.c traysense.res -o TraySense.exe -lole32 -loleaut32
+# 1. TrayVitals.exe
+cd src/TrayVitals
+"$WINDRES" trayvitals.rc -O coff -o trayvitals.res
+"$CC" -Os -s -mwindows -Wall -ffunction-sections -fdata-sections -Wl,--gc-sections $EXTRA_CFLAGS \
+      trayvitals.c trayvitals.res -o TrayVitals.exe -lole32 -loleaut32
 
-# 2. TraySense-Setup.exe
+# 2. TrayVitals-Setup.exe
 cd ../installer
 "$WINDRES" setup.rc -O coff -o setup.res
 "$CC" -Os -s -municode -mwindows -Wall -Wextra \
-      setup.c setup.res -o TraySense-Setup.exe -lole32 -luuid -lshell32 -ladvapi32 -lcomctl32 -lbcrypt -lsetupapi
+      setup.c setup.res -o TrayVitals-Setup.exe -lole32 -luuid -lshell32 -ladvapi32 -lcomctl32 -lbcrypt -lsetupapi
 
 cd ../..
-cp src/installer/TraySense-Setup.exe .
-ls -l TraySense-Setup.exe
-sha256sum TraySense-Setup.exe
+cp src/installer/TrayVitals-Setup.exe .
+ls -l TrayVitals-Setup.exe
+sha256sum TrayVitals-Setup.exe

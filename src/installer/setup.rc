@@ -3,32 +3,53 @@
 #include "../version.h"
 
 1 24 "setup.manifest"
-200 RCDATA "../TraySense-main/TraySense.exe"
+1 ICON "../TrayVitals/trayvitals.ico"
+200 RCDATA "../TrayVitals/TrayVitals.exe"
 201 RCDATA "pawnio/PawnIO_setup.exe"
 
-IDD_SETUP DIALOGEX 0, 0, 320, 192
+210 RCDATA "images/menu-modern.png"
+211 RCDATA "images/menu-classic.png"
+
+/* A four-page setup: Welcome, Menu style, Options, Install. setup.c shows one page's controls at a time. */
+IDD_SETUP DIALOGEX 0, 0, 380, 300
 STYLE DS_MODALFRAME | DS_CENTER | DS_SHELLFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "TraySense Setup"
+CAPTION "TrayVitals Setup"
 FONT 9, "Segoe UI", 400, 0, 1
 BEGIN
-    LTEXT           "TraySense", IDC_TITLE, 12, 10, 296, 12
-    LTEXT           "Shows CPU, GPU and RAM usage and temperatures on your taskbar. Right-click the labels and choose ""Show on display"" to pick which monitor.",
-                    IDC_STATIC_INFO, 12, 24, 296, 20
-    LTEXT           "Install to:", IDC_STATIC_DIR, 12, 52, 296, 9
-    EDITTEXT        IDC_DIR, 12, 63, 238, 14, ES_AUTOHSCROLL
-    PUSHBUTTON      "&Browse...", IDC_BROWSE, 254, 62, 54, 16
-    AUTOCHECKBOX    "Create a &desktop shortcut", IDC_DESKTOP, 12, 88, 296, 10
-    AUTOCHECKBOX    "&Start TraySense with Windows", IDC_STARTUP, 12, 102, 296, 10
-    AUTOCHECKBOX    "Install &CPU temperature support (PawnIO driver)", IDC_PAWNIO, 12, 116, 296, 10
-    AUTOCHECKBOX    "&Launch TraySense when setup finishes", IDC_LAUNCH, 12, 130, 296, 10
-    LTEXT           "", IDC_NOTE, 12, 146, 296, 18
-    DEFPUSHBUTTON   "&Install", IDOK, 196, 168, 54, 16
-    PUSHBUTTON      "Cancel", IDCANCEL, 254, 168, 54, 16
-END
+    LTEXT           "", IDC_STEP, 12, 8, 356, 9
+    LTEXT           "TrayVitals", IDC_TITLE, 12, 18, 356, 14
+    LTEXT           "", IDC_STATIC_INFO, 12, 34, 356, 18
 
+    /* 1. Welcome */
+    LTEXT           "", IDC_WELCOME, 12, 60, 356, 150
+
+    /* 2. Menu style */
+    CONTROL         "", IDC_IMG_MODERN, "Static", SS_OWNERDRAW | SS_NOTIFY, 12, 56, 174, 194
+    CONTROL         "", IDC_IMG_CLASSIC, "Static", SS_OWNERDRAW | SS_NOTIFY, 194, 56, 174, 194
+    AUTORADIOBUTTON "&Modern: themes, transparency, stays open", IDC_STYLE_MODERN, 14, 254, 170, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "&Classic: Windows' standard menu", IDC_STYLE_CLASSIC, 196, 254, 170, 10
+
+    /* 3. Options */
+    AUTOCHECKBOX    "Create a &desktop shortcut", IDC_DESKTOP, 12, 62, 356, 10, WS_GROUP | WS_TABSTOP
+    AUTOCHECKBOX    "&Start TrayVitals with Windows", IDC_STARTUP, 12, 80, 356, 10, WS_TABSTOP
+    AUTOCHECKBOX    "Install &CPU temperature support (PawnIO driver)", IDC_PAWNIO, 12, 98, 356, 10, WS_TABSTOP
+    AUTOCHECKBOX    "&Launch TrayVitals when setup finishes", IDC_LAUNCH, 12, 116, 356, 10, WS_TABSTOP
+    LTEXT           "", IDC_NOTE, 12, 140, 356, 40
+
+    /* 4. Install */
+    LTEXT           "Install to:", IDC_STATIC_DIR, 12, 60, 356, 9
+    EDITTEXT        IDC_DIR, 12, 71, 292, 14, ES_AUTOHSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Browse...", IDC_BROWSE, 308, 70, 60, 16, WS_TABSTOP
+    LTEXT           "", IDC_SUMMARY, 12, 98, 356, 110
+
+    CONTROL         "", IDC_LINE, "Static", SS_ETCHEDHORZ, 0, 270, 380, 1
+    PUSHBUTTON      "< &Back", IDC_BACK, 196, 278, 54, 16, WS_GROUP | WS_TABSTOP
+    DEFPUSHBUTTON   "&Continue >", IDOK, 254, 278, 54, 16, WS_TABSTOP
+    PUSHBUTTON      "Cancel", IDCANCEL, 314, 278, 54, 16, WS_TABSTOP
+END
 1 VERSIONINFO
-FILEVERSION TS_VER_MAJOR,TS_VER_MINOR,TS_VER_PATCH,0
-PRODUCTVERSION TS_VER_MAJOR,TS_VER_MINOR,TS_VER_PATCH,0
+FILEVERSION TV_VER_MAJOR,TV_VER_MINOR,TV_VER_PATCH,0
+PRODUCTVERSION TV_VER_MAJOR,TV_VER_MINOR,TV_VER_PATCH,0
 FILEOS 0x40004
 FILETYPE 0x1
 BEGIN
@@ -36,12 +57,12 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "FileDescription", "TraySense Setup"
-      VALUE "ProductName", "TraySense"
-      VALUE "ProductVersion", TS_VERSION_A
-      VALUE "FileVersion", TS_VERSION_A
-      VALUE "LegalCopyright", "MIT License, TraySense contributors"
-      VALUE "OriginalFilename", "TraySense-Setup.exe"
+      VALUE "FileDescription", "TrayVitals Setup"
+      VALUE "ProductName", "TrayVitals"
+      VALUE "ProductVersion", TV_VERSION_A
+      VALUE "FileVersion", TV_VERSION_A
+      VALUE "LegalCopyright", "TraySense contributors (MIT) and Fakem1d (PolyForm Noncommercial 1.0.0), see LICENSE"
+      VALUE "OriginalFilename", "TrayVitals-Setup.exe"
     END
   END
   BLOCK "VarFileInfo"

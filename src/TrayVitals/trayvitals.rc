@@ -1,0 +1,30 @@
+#include "../version.h"
+
+1 24 "trayvitals.manifest"
+1 ICON "trayvitals.ico"
+101 RCDATA "pawnio/IntelMSR.bin"
+102 RCDATA "pawnio/AMDFamily17.bin"
+
+1 VERSIONINFO
+FILEVERSION TV_VER_MAJOR,TV_VER_MINOR,TV_VER_PATCH,0
+PRODUCTVERSION TV_VER_MAJOR,TV_VER_MINOR,TV_VER_PATCH,0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "TrayVitals"
+      VALUE "ProductName", "TrayVitals"
+      VALUE "ProductVersion", TV_VERSION_A
+      VALUE "FileVersion", TV_VERSION_A
+      VALUE "LegalCopyright", "TraySense contributors (MIT) and Fakem1d (PolyForm Noncommercial 1.0.0), see LICENSE"
+      VALUE "OriginalFilename", "TrayVitals.exe"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

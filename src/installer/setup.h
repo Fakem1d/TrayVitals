@@ -9,3 +9,15 @@
 #define IDC_LAUNCH       1007
 #define IDC_NOTE         1008
 #define IDC_PAWNIO       1009
+#define IDC_STYLE_LABEL  1010
+#define IDC_STYLE_MODERN 1011
+#define IDC_STYLE_CLASSIC 1012
+#define IDC_BACK         1013
+#define IDC_IMG_MODERN   1014
+#define IDC_IMG_CLASSIC  1015
+#define IDC_STEP         1016
+#define IDC_WELCOME      1017
+#define IDC_SUMMARY      1018
+#define IDC_LINE         1019
+#define IMG_MODERN       210
+#define IMG_CLASSIC      211
