@@ -1,8 +1,11 @@
-# Builds TraySense on GitHub's own machines, straight from the code in this repo.
+# Builds TrayVitals on GitHub's own machines, straight from the code in this repo.
 #  - Every change to main: builds it and keeps the files under the run's "Artifacts".
 #  - Every published release: builds that release's tag, signs a build attestation
 #    (proof the file came from this repo and this workflow), and attaches
-#    TraySense-Setup.exe and its checksum to the release.
+#    TrayVitals-Setup.exe and its checksum to the release.
+#  - TrayVitals was called TraySense before 1.10.0, and TraySense 1.9.0 updates itself by downloading
+#    a file named TraySense-Setup.exe. So releases also carry the same installer under that name;
+#    it moves an old TraySense install over to TrayVitals.
 name: build
 on:
   push:
@@ -33,7 +36,7 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          v=$(sed -n 's/^#define TS_VERSION_A "\(.*\)".*/\1/p' src/version.h)
+          v=$(sed -n 's/^#define TV_VERSION_A "\(.*\)".*/\1/p' src/version.h)
           echo "tag $TAG, version $v"
           [ "$TAG" = "v$v" ] || { echo "::error::Release tag $TAG doesn't match version $v in src/version.h"; exit 1; }
 
@@ -41,22 +44,27 @@ jobs:
         run: |
           export PATH="/c/mingw64/bin:$PATH"
           sh build.sh
+          cp TrayVitals-Setup.exe TraySense-Setup.exe   # for TraySense 1.9.0's updater
 
-      - name: Checksum
-        run: sha256sum TraySense-Setup.exe | tee TraySense-Setup.exe.sha256
+      - name: Checksums
+        run: |
+          sha256sum TrayVitals-Setup.exe | tee TrayVitals-Setup.exe.sha256
+          sha256sum TraySense-Setup.exe | tee TraySense-Setup.exe.sha256
 
       - name: Build attestation
         if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: TraySense-Setup.exe
+          subject-path: |
+            TrayVitals-Setup.exe
+            TraySense-Setup.exe
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: TraySense
+          name: TrayVitals
           path: |
-            TraySense-Setup.exe
-            TraySense-Setup.exe.sha256
+            TrayVitals-Setup.exe
+            TrayVitals-Setup.exe.sha256
 
       - name: Attach to the release
         if: github.event_name == 'release'
@@ -64,4 +72,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" TraySense-Setup.exe TraySense-Setup.exe.sha256 --clobber
+        run: gh release upload "$TAG" TrayVitals-Setup.exe TrayVitals-Setup.exe.sha256 TraySense-Setup.exe TraySense-Setup.exe.sha256 --clobber
