@@ -1,6 +1,12 @@
 /* Patch notes shown in the "What's new" window (once after an update, and from the menu).
    Newest version first. Each version is one block: its header line, then lines starting with "\x2022 ". */
 static const wchar_t PATCH_NOTES[] =
+    L"1.11.0\r\n"
+    L"\x2022 Faster, lighter updates: \"Update now\" downloads just the new program (a small file) and swaps it "
+    L"in, instead of downloading and running the whole installer. TrayVitals restarts a second later.\r\n"
+    L"\x2022 Never in the way while gaming: the update popup and the daily check wait while a game or video "
+    L"fills the screen, including borderless full screen, and the popup comes about a minute after you stop.\r\n"
+    L"\r\n"
     L"1.10.1\r\n"
     L"\x2022 The update popups (a new version is available, up to date, download problems) now always stay "
     L"solid, like this window, so they're easy to read even with Transparency turned up.\r\n"

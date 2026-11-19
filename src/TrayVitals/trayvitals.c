@@ -741,6 +741,7 @@ static BYTE *http_get(const wchar_t *host, const wchar_t *path, DWORD *len)
 static int sha256_is(const BYTE *data, DWORD len, const BYTE *want)
 {
     BCRYPT_ALG_HANDLE alg; BCRYPT_HASH_HANDLE h; BYTE out[32]; int ok = 0;
+    if (!load_net()) return 0;   /* the hashing functions are loaded there (the update helper hasn't gone online) */
     if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0)) return 0;
     if (!BCryptCreateHash(alg, &h, NULL, 0, NULL, 0, 0)) {
         if (!BCryptHashData(h, (PUCHAR)data, len, 0) && !BCryptFinishHash(h, out, 32, 0)) ok = !memcmp(out, want, 32);
@@ -2093,9 +2094,15 @@ static void notes_after_update(void)
 
 /* ---- Updates ----
    Once a day TrayVitals asks GitHub for the latest release of TV_UPDATE_REPO (one small request, no account
-   needed). If it's newer than this version, TrayVitals says so. "Update now" downloads that release's
-   TrayVitals-Setup.exe, checks it against the SHA-256 checksum GitHub lists for the file, and runs it with
-   /update: it installs over this copy with the same settings and starts TrayVitals again. */
+   needed), but not while a game or video fills the screen. If it's newer than this version, TrayVitals
+   says so, again only once nothing fills the screen.
+   "Update now" downloads that release's TrayVitals-update.bin (the bare program, about 260 KB), checks it
+   against the SHA-256 checksum GitHub lists for the file, swaps it in for this copy and restarts: the
+   in-app update. Releases without that file, or if the swap fails, use the installer instead:
+   TrayVitals-Setup.exe, checked the same way and run with /update. */
+#ifndef TV_APP_ASSET
+#define TV_APP_ASSET "TrayVitals-update.bin"   /* the release file with the bare program */
+#endif
 #define WM_UPDATE        (WM_APP + 3)   /* lp: UPDINFO * from the update thread */
 #define TIMER_UPDATE     9
 #define TIMER_UPD_NOTICE 10
@@ -2108,6 +2115,9 @@ typedef struct {
     wchar_t ver[24];          /* the newer version, like 1.9.1 */
     char    url[512];         /* its installer on github.com; "" if the release has none */
     BYTE    sha[32];
+    char    aurl[512];        /* its bare program (in-app update); "" if the release has none */
+    BYTE    asha[32];
+    int     inApp;            /* the download is the bare program */
     wchar_t file[MAX_PATH];   /* where the download was saved */
 } UPDINFO;
 static UPDINFO       g_upd;   /* the newer version found (g_upd.ver[0] != 0); main thread only */
@@ -2180,24 +2190,28 @@ static void upd_parse(const char *j, DWORD len, UPDINFO *u)
     if (u->ver[0] == L'v' || u->ver[0] == L'V') memmove(u->ver, u->ver + 1, lstrlenW(u->ver) * sizeof(wchar_t));
     if (!ver_newer(nv, cur)) { u->result = UPD_CURRENT; return; }
     u->result = UPD_NEWER;
-    /* Each file attached to the release lists its "digest" and then, last, its "browser_download_url". */
+    /* Each file attached to the release lists its "digest" and then, last, its "browser_download_url".
+       Two of them matter: the installer and the bare program. Neither is used without its checksum. */
     while ((after = json_str(from, end, "browser_download_url", url, sizeof url))) {
-        int ul = lstrlenA(url), al = lstrlenA(TV_UPDATE_ASSET);
-        if (ul > al + (int)sizeof GH_PREFIX - 1 && !_strnicmp(url, GH_PREFIX, sizeof GH_PREFIX - 1) &&
-            url[ul - al - 1] == '/' && !_stricmp(url + ul - al, TV_UPDATE_ASSET) && !strpbrk(url, " \"<>\\")) {
+        const char *names[2] = { TV_UPDATE_ASSET, TV_APP_ASSET };
+        for (int k = 0; k < 2; k++) {
+            int ul = lstrlenA(url), al = lstrlenA(names[k]);
+            if (!(ul > al + (int)sizeof GH_PREFIX - 1 && !_strnicmp(url, GH_PREFIX, sizeof GH_PREFIX - 1) &&
+                  url[ul - al - 1] == '/' && !_stricmp(url + ul - al, names[k]) && !strpbrk(url, " \"<>\\"))) continue;
             const char *q = from, *q2;
-            int got = 0;
+            BYTE sha[32];
+            int got = 0, ok = 0;
             while ((q2 = json_str(q, after, "digest", dg, sizeof dg))) { got = 1; q = q2; }
             if (got && !_strnicmp(dg, "sha256:", 7) && lstrlenA(dg) == 7 + 64) {
-                int ok = 1;
+                ok = 1;
                 for (int i = 0; i < 32 && ok; i++) {
                     int hi = hexval(dg[7 + 2 * i]), lo = hexval(dg[8 + 2 * i]);
-                    if (hi < 0 || lo < 0) ok = 0; else u->sha[i] = (BYTE)(hi << 4 | lo);
+                    if (hi < 0 || lo < 0) ok = 0; else sha[i] = (BYTE)(hi << 4 | lo);
                 }
-                u->hasSha = ok;
             }
-            if (u->hasSha) lstrcpyA(u->url, url);   /* without a checksum it is never run */
-            return;
+            if (!ok) continue;
+            if (k == 0) { memcpy(u->sha, sha, 32); u->hasSha = 1; lstrcpyA(u->url, url); }
+            else { memcpy(u->asha, sha, 32); lstrcpyA(u->aurl, url); }
         }
         from = after;
     }
@@ -2245,23 +2259,33 @@ static int upd_path(wchar_t *out, int create)
 /* Removes the installer left from the last update (it can't delete itself while it runs). */
 static void upd_cleanup(void)
 {
-    wchar_t f[MAX_PATH];
-    if (!upd_path(f, 0) || !DeleteFileW(f) || is_admin()) return;
+    wchar_t f[MAX_PATH], b[MAX_PATH];
+    if (!upd_path(f, 0)) return;
+    lstrcpyW(b, f);
+    wchar_t *s = wcsrchr(b, L'\\');
+    if (s) { lstrcpyW(s + 1, L"TrayVitals-update.bin"); DeleteFileW(b); }   /* a leftover in-app download */
+    if (!DeleteFileW(f) || is_admin()) return;
     *wcsrchr(f, L'\\') = 0;
     RemoveDirectoryW(f);
 }
+
+static int g_updNoApp;   /* the in-app update failed once: use the installer from now on */
 
 static void upd_download(UPDINFO *u)
 {
     wchar_t path[512];
     DWORD len = 0, w;
     u->result = UPD_FAILED;
-    if (!u->hasSha || _strnicmp(u->url, GH_PREFIX, sizeof GH_PREFIX - 1) ||
-        !MultiByteToWideChar(CP_UTF8, 0, u->url + sizeof GH_PREFIX - 2, -1, path, 512)) return;
+    u->inApp = u->aurl[0] && !g_updNoApp;
+    const char *url = u->inApp ? u->aurl : u->url;
+    const BYTE *sha = u->inApp ? u->asha : u->sha;
+    if ((!u->inApp && !u->hasSha) || _strnicmp(url, GH_PREFIX, sizeof GH_PREFIX - 1) ||
+        !MultiByteToWideChar(CP_UTF8, 0, url + sizeof GH_PREFIX - 2, -1, path, 512)) return;
     BYTE *bin = http_get(L"github.com", path, &len);
     if (!bin) return;
-    if (!sha256_is(bin, len, u->sha)) { u->result = UPD_BADHASH; HeapFree(GetProcessHeap(), 0, bin); return; }
+    if (!sha256_is(bin, len, sha)) { u->result = UPD_BADHASH; HeapFree(GetProcessHeap(), 0, bin); return; }
     if (upd_path(u->file, 1)) {
+        if (u->inApp) { wchar_t *s = wcsrchr(u->file, L'\\'); if (s) lstrcpyW(s + 1, L"TrayVitals-update.bin"); }
         HANDLE f = CreateFileW(u->file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
         int ok = f != INVALID_HANDLE_VALUE && WriteFile(f, bin, len, &w, NULL) && w == len;
         if (f != INVALID_HANDLE_VALUE) CloseHandle(f);
@@ -2319,7 +2343,7 @@ static void open_releases(void)
 
 static void upd_now(void)
 {
-    if (g_upd.url[0]) upd_start(UPD_DOWNLOAD);
+    if (g_upd.url[0] || g_upd.aurl[0]) upd_start(UPD_DOWNLOAD);
     else open_releases();
 }
 
@@ -2335,21 +2359,220 @@ static void upd_prompt(void)
     body[399] = 0;
     UIBTN b[3] = { { 100, g_upd.url[0] ? L"Update now" : L"Open download page" },
                    { 101, L"Later" }, { 102, L"Skip this version" } };
+    if (g_upd.aurl[0] && !g_updNoApp) {
+        _snwprintf(body, 400, L"You have version " TV_VERSION L".\n\n%s", is_admin()
+                       ? L"Updating takes a few seconds (a small download) and keeps your settings. TrayVitals restarts when it's done."
+                       : L"Updating takes a few seconds (a small download) and keeps your settings. Windows will ask for "
+                         L"permission, then TrayVitals restarts.");
+        body[399] = 0;
+    }
+    UIBTN b2[3] = { { 100, (g_upd.url[0] || g_upd.aurl[0]) ? L"Update now" : L"Open download page" },
+                    { 101, L"Later" }, { 102, L"Skip this version" } };
+    memcpy(b, b2, sizeof b);
     int c = ui_dialog(head, body, b, 3, UI_UPDATE | UI_SOLID);
     if (c == 100) upd_now();
     else if (c == 102)
         RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"UpdateSkip", REG_SZ, g_upd.ver, (lstrlenW(g_upd.ver) + 1) * sizeof(wchar_t));
 }
 
-/* An automatic check found an update: say so, but not over a full-screen game, video or presentation. */
-static void upd_notice(void)
+/* Is a game, video or presentation filling the screen? Windows reports exclusive full screen and
+   presentations itself; a borderless full-screen game or video is spotted by its window covering
+   the whole monitor. (A maximized window leaves the taskbar visible, so it doesn't count.) */
+static int screen_busy(void)
 {
     QUERY_USER_NOTIFICATION_STATE s;
-    if (SUCCEEDED(SHQueryUserNotificationState(&s)) && s != QUNS_ACCEPTS_NOTIFICATIONS && s != QUNS_QUIET_TIME) {
-        SetTimer(g_wnd, TIMER_UPD_NOTICE, 10 * 60 * 1000, NULL);
-        return;
-    }
+    if (SUCCEEDED(SHQueryUserNotificationState(&s)) && s != QUNS_ACCEPTS_NOTIFICATIONS && s != QUNS_QUIET_TIME) return 1;
+    HWND f = GetForegroundWindow();
+    wchar_t cls[64] = L"";
+    RECT r;
+    MONITORINFO mi = { sizeof mi };
+    if (!f || !IsWindowVisible(f) || IsIconic(f)) return 0;
+    GetClassNameW(f, cls, 64);
+    if (!lstrcmpW(cls, L"Progman") || !lstrcmpW(cls, L"WorkerW") || !lstrcmpW(cls, L"Shell_TrayWnd")) return 0;
+    if (!GetWindowRect(f, &r) || !GetMonitorInfoW(MonitorFromWindow(f, MONITOR_DEFAULTTONEAREST), &mi)) return 0;
+    return r.left <= mi.rcMonitor.left && r.top <= mi.rcMonitor.top &&
+           r.right >= mi.rcMonitor.right && r.bottom >= mi.rcMonitor.bottom;
+}
+
+/* An automatic check found an update: say so, but never over a game, video or presentation.
+   While one fills the screen, look again every minute, so the popup comes soon after it ends. */
+static void upd_notice(void)
+{
+    if (screen_busy()) { SetTimer(g_wnd, TIMER_UPD_NOTICE, 60 * 1000, NULL); return; }
     upd_prompt();
+}
+
+/* ---- In-app update: swapping in the new program ---- */
+#define UNKEY_TV L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TrayVitals"
+
+/* The copies to replace: this one, the installed one (where Settings > Apps says it is) and the
+   Program Files copy the "start as administrator at login" task runs. Each only once. */
+static int upd_targets(wchar_t t[3][MAX_PATH])
+{
+    wchar_t p[MAX_PATH], c[3][MAX_PATH];
+    int n = 0, k = 0;
+    DWORD sz, len = GetModuleFileNameW(NULL, p, MAX_PATH);
+    if (len && len < MAX_PATH) lstrcpyW(c[k++], p);
+    sz = sizeof p;
+    if (!RegGetValueW(HKEY_LOCAL_MACHINE, UNKEY_TV, L"InstallLocation", RRF_RT_REG_SZ, NULL, p, &sz) && lstrlenW(p) < MAX_PATH - 20) {
+        lstrcatW(p, L"\\TrayVitals.exe");
+        lstrcpyW(c[k++], p);
+    }
+    sz = sizeof p;
+    if (!RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion", L"ProgramFilesDir",
+                      RRF_RT_REG_SZ, NULL, p, &sz) && lstrlenW(p) < MAX_PATH - 30) {
+        lstrcatW(p, L"\\TrayVitals\\TrayVitals.exe");
+        lstrcpyW(c[k++], p);
+    }
+#ifdef TV_UPDTEST
+    k = 1;   /* tests: only the test program itself */
+#endif
+    for (int i = 0; i < k; i++) {
+        int dup = GetFileAttributesW(c[i]) == INVALID_FILE_ATTRIBUTES;   /* only copies that exist */
+        for (int j = 0; j < n && !dup; j++) if (!lstrcmpiW(t[j], c[i])) dup = 1;
+        if (!dup) lstrcpyW(t[n++], c[i]);
+    }
+    return n;
+}
+
+/* Replaces every copy with the new program. Each old copy is renamed to .old first (a running
+   program can be renamed, not overwritten); if anything fails, all of them are put back.
+   Returns 1 when every copy is the new program. Needs administrator rights. */
+static int upd_swap(const BYTE *bin, DWORD len, const wchar_t *ver)
+{
+    wchar_t t[3][MAX_PATH], old[3][MAX_PATH];
+    int n = upd_targets(t), done = 0, ok = 1;
+    DWORD w;
+    if (g_self != INVALID_HANDLE_VALUE) { CloseHandle(g_self); g_self = INVALID_HANDLE_VALUE; }   /* our own lock */
+    for (int i = 0; i < n && ok; i++) {
+        _snwprintf(old[i], MAX_PATH, L"%s.old", t[i]); old[i][MAX_PATH - 1] = 0;
+        DeleteFileW(old[i]);
+        if (!MoveFileExW(t[i], old[i], MOVEFILE_REPLACE_EXISTING)) { ok = 0; break; }
+        done = i + 1;
+        HANDLE f = CreateFileW(t[i], GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+        ok = f != INVALID_HANDLE_VALUE && WriteFile(f, bin, len, &w, NULL) && w == len;
+        if (f != INVALID_HANDLE_VALUE) CloseHandle(f);
+    }
+    if (!ok) {
+        for (int i = 0; i < done; i++) { DeleteFileW(t[i]); MoveFileExW(old[i], t[i], MOVEFILE_REPLACE_EXISTING); }
+        return 0;
+    }
+    if (n) RegSetKeyValueW(HKEY_LOCAL_MACHINE, UNKEY_TV, L"DisplayVersion", REG_SZ, ver, (lstrlenW(ver) + 1) * sizeof(wchar_t));
+    return n > 0;
+}
+
+/* Reads a downloaded file and checks it against its checksum. The caller frees the buffer. */
+static BYTE *upd_read(const wchar_t *file, const BYTE *sha, DWORD *len)
+{
+    HANDLE f = CreateFileW(file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    LARGE_INTEGER sz;
+    BYTE *b = NULL;
+    DWORD got = 0;
+    if (f == INVALID_HANDLE_VALUE) return NULL;
+    if (GetFileSizeEx(f, &sz) && sz.QuadPart > 0 && sz.QuadPart < (16 << 20) &&
+        (b = HeapAlloc(GetProcessHeap(), 0, (SIZE_T)sz.QuadPart)) &&
+        !(ReadFile(f, b, (DWORD)sz.QuadPart, &got, NULL) && got == (DWORD)sz.QuadPart && sha256_is(b, got, sha))) {
+        HeapFree(GetProcessHeap(), 0, b);
+        b = NULL;
+    }
+    CloseHandle(f);
+    *len = got;
+    return b;
+}
+
+/* Starts a program as the signed-in user, not as administrator (through Explorer). */
+static void start_unelevated(const wchar_t *exe)
+{
+    wchar_t ex[MAX_PATH], arg[MAX_PATH + 4];
+    if (sys_path(ex, L"..\\explorer.exe")) {
+        _snwprintf(arg, MAX_PATH + 4, L"\"%s\"", exe); arg[MAX_PATH + 3] = 0;
+        if ((INT_PTR)ShellExecuteW(NULL, L"open", ex, arg, NULL, SW_SHOWNORMAL) > 32) return;
+    }
+    ShellExecuteW(NULL, L"open", exe, NULL, NULL, SW_SHOWNORMAL);
+}
+
+/* The in-app update, once the new program is downloaded and checked. Returns 1 if it's on its way
+   (this copy then closes), 0 if it didn't work (the caller falls back to the installer). */
+static int upd_apply(UPDINFO *u)
+{
+    wchar_t self[MAX_PATH];
+    DWORD n = GetModuleFileNameW(NULL, self, MAX_PATH), len;
+    if (!n || n >= MAX_PATH) return 0;
+    if (is_admin()) {
+        BYTE *bin = upd_read(u->file, u->asha, &len);
+        int ok = bin && upd_swap(bin, len, u->ver);
+        if (bin) HeapFree(GetProcessHeap(), 0, bin);
+        DeleteFileW(u->file);
+        if (!ok) return 0;
+        STARTUPINFOW si; PROCESS_INFORMATION pi;
+        wchar_t cmd[MAX_PATH + 16];
+        ZeroMemory(&si, sizeof si); si.cb = sizeof si;
+        _snwprintf(cmd, MAX_PATH + 16, L"\"%s\" /restart", self); cmd[MAX_PATH + 15] = 0;
+        if (CreateProcessW(self, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) { CloseHandle(pi.hProcess); CloseHandle(pi.hThread); }
+        DestroyWindow(g_wnd);
+        return 1;
+    }
+    /* Not administrator: one permission prompt starts a helper (this same program) that checks the file
+       again, swaps it in, waits for this copy to close and starts the new one as the signed-in user. */
+    wchar_t args[MAX_PATH + 200], hex[65];
+    for (int i = 0; i < 32; i++) _snwprintf(hex + 2 * i, 3, L"%02x", u->asha[i]);
+    hex[64] = 0;
+    _snwprintf(args, MAX_PATH + 200, L"/apply-update %lu %s %s \"%s\"", GetCurrentProcessId(), hex, u->ver, u->file);
+    args[MAX_PATH + 199] = 0;
+    SHELLEXECUTEINFOW e; ZeroMemory(&e, sizeof e);
+    e.cbSize = sizeof e; e.fMask = SEE_MASK_NOASYNC; e.hwnd = g_wnd;
+    e.lpVerb = L"runas"; e.lpFile = self; e.lpParameters = args; e.nShow = SW_HIDE;
+    if (ShellExecuteExW(&e)) { DestroyWindow(g_wnd); return 1; }
+    if (GetLastError() == ERROR_CANCELLED) return 1;   /* "No" to Windows' question: nothing to fall back to */
+    return 0;
+}
+
+/* The helper's side of the above (started as administrator with /apply-update). */
+static int upd_helper(void)
+{
+    int argc = 0;
+    LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    int r = 1;
+    if (argv && argc >= 6 && is_admin() && lstrlenW(argv[3]) == 64) {
+        BYTE sha[32];
+        int ok = 1;
+        for (int i = 0; i < 32 && ok; i++) {
+            char h[3] = { (char)argv[3][2 * i], (char)argv[3][2 * i + 1], 0 };
+            int hi = hexval(h[0]), lo = hexval(h[1]);
+            if (hi < 0 || lo < 0) ok = 0; else sha[i] = (BYTE)(hi << 4 | lo);
+        }
+        DWORD len, pid = (DWORD)_wtoi(argv[2]);
+        BYTE *bin = ok ? upd_read(argv[5], sha, &len) : NULL;   /* checked again: the file sat in the user's temp folder */
+        HANDLE p = OpenProcess(SYNCHRONIZE, FALSE, pid);
+        if (p) { WaitForSingleObject(p, 10000); CloseHandle(p); }   /* the old copy closes first */
+        if (bin && upd_swap(bin, len, argv[4])) {
+            wchar_t self[MAX_PATH];
+            DWORD n = GetModuleFileNameW(NULL, self, MAX_PATH);
+            if (n && n < MAX_PATH) start_unelevated(self);
+            r = 0;
+        }
+        if (bin) HeapFree(GetProcessHeap(), 0, bin);
+        DeleteFileW(argv[5]);
+        if (r) {   /* didn't work: start the old copy again, so TrayVitals doesn't just disappear */
+            wchar_t self[MAX_PATH];
+            DWORD n = GetModuleFileNameW(NULL, self, MAX_PATH);
+            if (n && n < MAX_PATH) start_unelevated(self);
+        }
+    }
+    if (argv) LocalFree(argv);
+    return r;
+}
+
+/* Removes the .old copies a finished in-app update left behind. */
+static void upd_old_cleanup(void)
+{
+    wchar_t t[3][MAX_PATH], o[MAX_PATH];
+    int n = upd_targets(t);
+    for (int i = 0; i < n; i++) {
+        _snwprintf(o, MAX_PATH, L"%s.old", t[i]); o[MAX_PATH - 1] = 0;
+        if (GetFileAttributesW(o) != INVALID_FILE_ATTRIBUTES && !DeleteFileW(o) && is_admin())
+            MoveFileExW(o, NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+    }
 }
 
 static void upd_run(const wchar_t *file)
@@ -2366,7 +2589,15 @@ static void upd_done(UPDINFO *u)
 {
     InterlockedExchange(&g_updBusy, 0);
     if (u->job == UPD_DOWNLOAD) {
-        if (u->result == UPD_NEWER) upd_run(u->file);
+        if (u->result == UPD_NEWER && u->inApp) {
+            if (!upd_apply(u)) {   /* the in-app update didn't work: the installer, as before */
+                g_updNoApp = 1;
+                if (g_upd.url[0]) { HeapFree(GetProcessHeap(), 0, u); upd_start(UPD_DOWNLOAD); return; }
+                ui_msg(L"Couldn't install the update", L"Get it from the TrayVitals download page.", UI_WARN | UI_SOLID);
+                open_releases();
+            }
+        }
+        else if (u->result == UPD_NEWER) upd_run(u->file);
         else if (ui_ask(u->result == UPD_BADHASH ? L"The update didn't pass its check" : L"Couldn't download the update",
                         u->result == UPD_BADHASH
                             ? L"The downloaded file didn't match its checksum, so it was not run. Open the download page instead?"
@@ -2992,6 +3223,7 @@ static LRESULT CALLBACK wndproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
         }
         if (wp == TIMER_UPDATE) {
             KillTimer(w, wp);
+            if (screen_busy()) { SetTimer(w, TIMER_UPDATE, 5 * 60 * 1000, NULL); return 0; }   /* not during a game */
             upd_cleanup();
             if (upd_auto_on() && !upd_start(UPD_AUTO)) upd_schedule(60 * 60 * 1000);
             return 0;
@@ -3060,6 +3292,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE prev, LPSTR cmd, int show)
         if (f) f(LOAD_LIBRARY_SEARCH_SYSTEM32);
         SetDllDirectoryW(L"");
     }
+    if (wcsstr(GetCommandLineW(), L"/apply-update")) return upd_helper();   /* in-app update helper, then quit */
     if (wcsstr(GetCommandLineW(), L"/make-task")) {
         /* Setup, moving an old TraySense install over: make TrayVitals' own "start as administrator at
            login" task in place of TraySense's, then quit. Only when run as administrator. */
@@ -3149,6 +3382,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE prev, LPSTR cmd, int show)
     notes_after_update();
     if (g_mode == MODE_TRAY) SetTimer(g_wnd, TIMER_TRAYCHECK_START, 3000, NULL);
     upd_cleanup();
+    upd_old_cleanup();
     upd_schedule(60 * 1000);   /* first check a minute after starting, so it never slows down sign-in */
 
     MSG m;
