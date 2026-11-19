@@ -1,0 +1,67 @@
+# Builds TraySense on GitHub's own machines, straight from the code in this repo.
+#  - Every change to main: builds it and keeps the files under the run's "Artifacts".
+#  - Every published release: builds that release's tag, signs a build attestation
+#    (proof the file came from this repo and this workflow), and attaches
+#    TraySense-Setup.exe and its checksum to the release.
+name: build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    permissions:
+      contents: write        # attach the files to the release
+      id-token: write        # build attestation
+      attestations: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Release tag matches src/version.h
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          v=$(sed -n 's/^#define TS_VERSION_A "\(.*\)".*/\1/p' src/version.h)
+          echo "tag $TAG, version $v"
+          [ "$TAG" = "v$v" ] || { echo "::error::Release tag $TAG doesn't match version $v in src/version.h"; exit 1; }
+
+      - name: Build
+        run: |
+          export PATH="/c/mingw64/bin:$PATH"
+          sh build.sh
+
+      - name: Checksum
+        run: sha256sum TraySense-Setup.exe | tee TraySense-Setup.exe.sha256
+
+      - name: Build attestation
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: TraySense-Setup.exe
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: TraySense
+          path: |
+            TraySense-Setup.exe
+            TraySense-Setup.exe.sha256
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" TraySense-Setup.exe TraySense-Setup.exe.sha256 --clobber
