@@ -1,0 +1,11 @@
+#define IDD_SETUP        100
+#define IDC_TITLE        1000
+#define IDC_STATIC_INFO  1001
+#define IDC_STATIC_DIR   1002
+#define IDC_DIR          1003
+#define IDC_BROWSE       1004
+#define IDC_DESKTOP      1005
+#define IDC_STARTUP      1006
+#define IDC_LAUNCH       1007
+#define IDC_NOTE         1008
+#define IDC_PAWNIO       1009

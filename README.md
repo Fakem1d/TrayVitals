@@ -93,6 +93,12 @@ Go to **Settings > Apps > Installed apps**, find **TraySense**, and click **Unin
 
 TraySense doesn't collect or send any data about you or your PC. The only time it goes online is the daily update check, which asks GitHub for the latest version number of this project. You can turn that off in **right-click > Updates**.
 
+## Security and open source
+
+All of the code is in [`src`](src). Every release is built by GitHub from that code, in public, and comes with a checksum and a build attestation you can check. [SECURITY.md](SECURITY.md) shows how, explains what TraySense does as administrator, and how to report a problem. [THIRD_PARTY.md](THIRD_PARTY.md) lists the outside parts it uses.
+
+To build it yourself, run `sh build.sh` in [w64devkit](https://github.com/skeeto/w64devkit).
+
 ## Credits
 
 - Based on [TraySense by DMTWEAKS](https://github.com/DMTWEAKS/traysense) (MIT License).

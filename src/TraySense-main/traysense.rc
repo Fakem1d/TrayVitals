@@ -1,0 +1,29 @@
+#include "../version.h"
+
+1 24 "traysense.manifest"
+101 RCDATA "pawnio/IntelMSR.bin"
+102 RCDATA "pawnio/AMDFamily17.bin"
+
+1 VERSIONINFO
+FILEVERSION TS_VER_MAJOR,TS_VER_MINOR,TS_VER_PATCH,0
+PRODUCTVERSION TS_VER_MAJOR,TS_VER_MINOR,TS_VER_PATCH,0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "TraySense"
+      VALUE "ProductName", "TraySense"
+      VALUE "ProductVersion", TS_VERSION_A
+      VALUE "FileVersion", TS_VERSION_A
+      VALUE "LegalCopyright", "MIT License, TraySense contributors"
+      VALUE "OriginalFilename", "TraySense.exe"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
