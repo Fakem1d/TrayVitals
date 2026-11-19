@@ -14,7 +14,7 @@ cd "$(dirname "$0")"
 
 CC=${CC:-x86_64-w64-mingw32-gcc}
 WINDRES=${WINDRES:-x86_64-w64-mingw32-windres}
-command -v "$CC" >/dev/null 2>&1 || { CC=gcc; WINDRES=windres; }
+command -v "$CC" >/dev/null 2>&1 && command -v "$WINDRES" >/dev/null 2>&1 || { CC=gcc; WINDRES=windres; }
 "$CC" --version | head -n 1
 
 # The installer includes the official PawnIO 2.2.0 setup (the CPU temperature driver).
