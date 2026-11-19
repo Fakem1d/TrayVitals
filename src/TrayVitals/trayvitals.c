@@ -1402,6 +1402,12 @@ static int uia_scan(void)
     return changed;
 }
 
+/* While a game or video fills the screen (screen_busy, further down), the taskbar and its labels
+   can't be seen, so both background jobs slow down to save resources: readings to every 5 seconds
+   (the slowest setting) and the taskbar layout check from every second to every 5 seconds. */
+#define GAME_INTERVAL 5000
+static int screen_busy(void);
+
 /* Keeps the free space up to date, about once a second, on its own thread. */
 static DWORD WINAPI scanner(void *unused)
 {
@@ -1413,7 +1419,7 @@ static DWORD WINAPI scanner(void *unused)
         if (g_mode == MODE_BAR && g_tb && !g_paused)
             changed = com ? uia_scan() : !InterlockedExchange(&g_scanNoUia, 1);
         if (changed) PostMessageW(g_wnd, WM_SAMPLED, 0, 0);
-        WaitForSingleObject(g_scanWake, g_paused ? INFINITE : 1000);
+        WaitForSingleObject(g_scanWake, g_paused ? INFINITE : screen_busy() ? GAME_INTERVAL : 1000);
     }
     if (g_uiaAll) IUIAutomationCondition_Release(g_uiaAll);
     if (g_uiaCache) IUIAutomationCacheRequest_Release(g_uiaCache);
@@ -1818,7 +1824,9 @@ static DWORD WINAPI sampler(void *unused)
             sample();
             PostMessageW(g_wnd, WM_SAMPLED, 0, 0);
         }
-        WaitForSingleObject(g_wake, g_paused ? INFINITE : g_interval);
+        DWORD wait = g_interval;
+        if (wait < GAME_INTERVAL && screen_busy()) wait = GAME_INTERVAL;   /* gaming: slowest */
+        WaitForSingleObject(g_wake, g_paused ? INFINITE : wait);
     }
     if (g_q) PdhCloseQuery(g_q);
     if (com) CoUninitialize();

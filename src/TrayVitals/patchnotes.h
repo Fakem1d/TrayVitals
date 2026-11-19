@@ -1,6 +1,12 @@
 /* Patch notes shown in the "What's new" window (once after an update, and from the menu).
    Newest version first. Each version is one block: its header line, then lines starting with "\x2022 ". */
 static const wchar_t PATCH_NOTES[] =
+    L"1.11.1\r\n"
+    L"\x2022 Lighter while gaming: when a game or video fills the screen, TrayVitals reads the sensors only every "
+    L"5 seconds and checks the taskbar less often, since you can't see the labels then anyway. It goes back to "
+    L"your refresh rate a few seconds after you stop.\r\n"
+    L"\x2022 This is also the first update TrayVitals 1.11.0 installs by itself in the new, lighter way.\r\n"
+    L"\r\n"
     L"1.11.0\r\n"
     L"\x2022 Faster, lighter updates: \"Update now\" downloads just the new program (a small file) and swaps it "
     L"in, instead of downloading and running the whole installer. TrayVitals restarts a second later.\r\n"
