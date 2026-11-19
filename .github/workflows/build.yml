@@ -40,9 +40,14 @@ jobs:
           echo "tag $TAG, version $v"
           [ "$TAG" = "v$v" ] || { echo "::error::Release tag $TAG doesn't match version $v in src/version.h"; exit 1; }
 
+      - name: Install the compiler (MinGW-w64 GCC, from the MSYS2 that GitHub's Windows machines have)
+        shell: pwsh
+        run: C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-gcc"
+
       - name: Build
         run: |
-          export PATH="/c/mingw64/bin:$PATH"
+          export PATH="/c/msys64/mingw64/bin:$PATH"
+          gcc --version
           sh build.sh
           cp TrayVitals-Setup.exe TraySense-Setup.exe   # for TraySense 1.9.0's updater
 
@@ -73,3 +78,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$TAG" TrayVitals-Setup.exe TrayVitals-Setup.exe.sha256 TraySense-Setup.exe TraySense-Setup.exe.sha256 --clobber
+
