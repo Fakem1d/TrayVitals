@@ -3,9 +3,9 @@
 #  - Every published release: builds that release's tag, signs a build attestation
 #    (proof the file came from this repo and this workflow), and attaches
 #    TrayVitals-Setup.exe and its checksum to the release.
-#  - TrayVitals was called TraySense before 1.10.0, and TraySense 1.9.0 updates itself by downloading
-#    a file named TraySense-Setup.exe. So releases also carry the same installer under that name;
-#    it moves an old TraySense install over to TrayVitals.
+#  - TrayVitals was called TraySense before 1.10.0. Releases 1.10.0 to 1.11.1 also carried the installer as
+#    TraySense-Setup.exe for TraySense 1.9.0's updater; from 1.11.2 on they don't. TrayVitals-Setup.exe
+#    still moves an old TraySense install over to TrayVitals when it's run by hand.
 #  - TrayVitals-update.bin is the bare program (TrayVitals.exe). TrayVitals 1.11.0 and later download
 #    just that to update themselves in a few seconds; it isn't meant to be downloaded by hand.
 name: build
@@ -51,13 +51,11 @@ jobs:
           export PATH="/c/msys64/mingw64/bin:$PATH"
           gcc --version
           CC=gcc WINDRES=windres sh build.sh   # the compiler and resource tool installed above
-          cp TrayVitals-Setup.exe TraySense-Setup.exe   # for TraySense 1.9.0's updater
           cp src/TrayVitals/TrayVitals.exe TrayVitals-update.bin   # the bare program, for TrayVitals' in-app update
 
       - name: Checksums
         run: |
           sha256sum TrayVitals-Setup.exe | tee TrayVitals-Setup.exe.sha256
-          sha256sum TraySense-Setup.exe | tee TraySense-Setup.exe.sha256
           sha256sum TrayVitals-update.bin | tee TrayVitals-update.bin.sha256
 
       - name: Build attestation
@@ -66,7 +64,6 @@ jobs:
         with:
           subject-path: |
             TrayVitals-Setup.exe
-            TraySense-Setup.exe
             TrayVitals-update.bin
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -82,4 +79,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" TrayVitals-Setup.exe TrayVitals-Setup.exe.sha256 TraySense-Setup.exe TraySense-Setup.exe.sha256 TrayVitals-update.bin TrayVitals-update.bin.sha256 --clobber
+        run: gh release upload "$TAG" TrayVitals-Setup.exe TrayVitals-Setup.exe.sha256 TrayVitals-update.bin TrayVitals-update.bin.sha256 --clobber

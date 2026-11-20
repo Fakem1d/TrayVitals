@@ -430,6 +430,8 @@ static void remove_files(const wchar_t *dir)
     fmt(p, MAX_PATH, L"%s\\TrayVitals.exe", dir); del_retry(p);
     fmt(p, MAX_PATH, L"%s\\uninstall.exe", dir); del_retry(p);
     fmt(p, MAX_PATH, L"%s\\task.xml", dir);      DeleteFileW(p);
+    fmt(p, MAX_PATH, L"%s\\LICENSE.txt", dir);   DeleteFileW(p);
+    fmt(p, MAX_PATH, L"%s\\LICENSE-NONCOMMERCIAL.md", dir); DeleteFileW(p);
     RemoveDirectoryW(dir);   /* fails, harmlessly, if anything else is in there */
 }
 
@@ -927,6 +929,15 @@ static int do_install(int update)
     }
     DWORD n = GetModuleFileNameW(NULL, self, MAX_PATH);
     if (n && n < MAX_PATH && lstrcmpiW(self, unin)) CopyFileW(self, unin, FALSE);
+
+    /* The licenses, next to the program. */
+    {
+        DWORD sz; const void *d;
+        fmt(buf, MAX_PATH + 96, L"%s\\LICENSE.txt", g_dir);
+        d = resource(202, &sz); write_bytes(buf, d, sz);
+        fmt(buf, MAX_PATH + 96, L"%s\\LICENSE-NONCOMMERCIAL.md", g_dir);
+        d = resource(203, &sz); write_bytes(buf, d, sz);
+    }
 
     /* Moved to a new folder: clear out the old one (only TrayVitals' own files). */
     if (prev[0] && lstrcmpiW(prev, g_dir) && lstrcmpiW(prev, pf)) remove_files(prev);

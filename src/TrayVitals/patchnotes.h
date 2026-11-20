@@ -1,6 +1,10 @@
 /* Patch notes shown in the "What's new" window (once after an update, and from the menu).
    Newest version first. Each version is one block: its header line, then lines starting with "\x2022 ". */
 static const wchar_t PATCH_NOTES[] =
+    L"1.11.2\r\n"
+    L"\x2022 Setup now puts the license files (LICENSE.txt and LICENSE-NONCOMMERCIAL.md) in the TrayVitals folder, "
+    L"next to the program, and uninstalling removes them again.\r\n"
+    L"\r\n"
     L"1.11.1\r\n"
     L"\x2022 Lighter while gaming: when a game or video fills the screen, TrayVitals reads the sensors only every "
     L"5 seconds and checks the taskbar less often, since you can't see the labels then anyway. It goes back to "

@@ -13,7 +13,7 @@ It's small and light: one program of about 260 KB, written in plain C. It only r
 
 Works on Windows 10 and Windows 11 (64-bit).
 
-> **TrayVitals was called TraySense** before version 1.10.0. It started as a fork of [TraySense by DMTWEAKS](https://github.com/DMTWEAKS/traysense) and now has its own name, so the two aren't mixed up. If you have TraySense 1.9.0 from this repo, it updates itself to TrayVitals and keeps your settings.
+> **TrayVitals was called TraySense** before version 1.10.0. It started as a fork of [TraySense by DMTWEAKS](https://github.com/DMTWEAKS/traysense) and now has its own name, so the two aren't mixed up. If you have TraySense 1.9.0 from this repo, download and run TrayVitals-Setup.exe once: it replaces TraySense and keeps your settings. (Releases 1.10.0 to 1.11.1 also had the same installer as `TraySense-Setup.exe`, just so 1.9.0 could update itself; from 1.11.2 on it's only offered as TrayVitals-Setup.exe. The credit to the original stays in [LICENSE](LICENSE).)
 
 ---
 
@@ -164,7 +164,7 @@ Everything TrayVitals is made from is in this repo, including the hidden files w
 | `src/installer/images/` | The menu pictures shown in setup |
 | `tools/make-icon.ps1` | Draws the icon (PowerShell, no extra software needed) |
 | `build.sh` | Builds everything (see [Build it yourself](#build-it-yourself)) |
-| `.github/workflows/build.yml` | How GitHub builds each release, step by step. In a fork, change it freely, for example to drop the extra `TraySense-Setup.exe` copy. |
+| `.github/workflows/build.yml` | How GitHub builds each release, step by step. In a fork, change it freely, for example to point the release step at your own files. |
 | `.gitignore` | Which files git leaves out: only build results and the downloaded PawnIO installer. Each line is explained in the file. |
 | `screenshots/` | The pictures in this README |
 | `LICENSE`, `LICENSE-NONCOMMERCIAL.md`, `SECURITY.md`, `THIRD_PARTY.md` | License, security notes and third-party parts |

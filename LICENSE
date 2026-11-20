@@ -6,10 +6,10 @@ It has two licenses, one for each part:
 
 1. MAIN LICENSE - the original TraySense, MIT License (at the end of this file).
    This fork is based on the original code as DMTWEAKS published it on 18 November 2026
-   under the MIT License, before the original project was relicensed under AGPL-3.0 on
-   19 November 2026 (commit a11eb84 in DMTWEAKS/traysense). That original code stays under
-   its MIT License, exactly as it was published. Nothing from the later, AGPL-3.0 versions
-   of the original is used in this fork.
+   under the MIT License (up to commit 4c55aa9 in DMTWEAKS/traysense), before the original
+   project was relicensed under AGPL-3.0 on 19 November 2026 (commit a11eb84). That original
+   code stays under its MIT License, exactly as it was published. Nothing from the later,
+   AGPL-3.0 versions of the original is used in this fork.
    The MIT License is reproduced below because it requires its notice to be kept with
    the original code; it may not be changed, and it covers that original code only.
 

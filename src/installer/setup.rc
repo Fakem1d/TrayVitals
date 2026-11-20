@@ -7,6 +7,10 @@
 200 RCDATA "../TrayVitals/TrayVitals.exe"
 201 RCDATA "pawnio/PawnIO_setup.exe"
 
+/* The licenses, installed next to TrayVitals.exe (the MIT License asks for its notice to go with every copy). */
+202 RCDATA "../../LICENSE"
+203 RCDATA "../../LICENSE-NONCOMMERCIAL.md"
+
 210 RCDATA "images/menu-modern.png"
 211 RCDATA "images/menu-classic.png"
 
