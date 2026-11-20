@@ -62,7 +62,7 @@ Right-click the labels or the tray icon to open the menu. There are two styles; 
 
 | Modern | Classic |
 |---|---|
-| <img src="screenshots/menu-modern.png" alt="Modern menu" width="300"> | <img src="screenshots/menu-classic.png" alt="Classic menu" width="260"> |
+| <img src="screenshots/menu-modern.png" alt="Modern menu" width="380"> | <img src="screenshots/menu-classic.png" alt="Classic menu" width="380"> |
 | TrayVitals' own menu. It stays open while you change settings, so you see each change right away. Follows the theme and transparency. | Windows' standard menu, in light or dark. Keeps it simple: themes and transparency are set from the modern menu. |
 
 | Setting | What it does |
