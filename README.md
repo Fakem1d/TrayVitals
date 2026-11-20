@@ -1,3 +1,5 @@
+> **Disclaimer:** README and all descriptions were written by Claude for ease of reading.
+
 # <img src="screenshots/icon.png" alt="" width="48" align="top"> TrayVitals
 
 [![Latest release](https://img.shields.io/github/v/release/Fakem1d/TrayVitals?label=latest)](https://github.com/Fakem1d/TrayVitals/releases/latest)
