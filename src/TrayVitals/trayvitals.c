@@ -2410,6 +2410,65 @@ static void upd_notice(void)
     upd_prompt();
 }
 
+/* ---- One-time request to AMD Radeon users: is GPU power right? ----
+   GPU power on AMD cards (1.10.0) was written from AMD's documentation, without a Radeon card to test on.
+   So TrayVitals asks AMD users, once, to compare its number with AMD Software's and report it on GitHub.
+   Remove this (set TV_ASK_AMD_POWER to 0) once enough cards are confirmed. */
+#ifndef TV_ASK_AMD_POWER
+#define TV_ASK_AMD_POWER 1
+#endif
+#define TIMER_AMD_ASK 11
+#define AMD_ASK_DELAY_MS (3 * 60 * 1000)   /* a few minutes after starting, after What's new and update checks */
+
+/* Percent-encodes s for a URL query value. */
+static void url_enc(wchar_t *out, int cap, const wchar_t *s)
+{
+    static const wchar_t hex[] = L"0123456789ABCDEF";
+    int n = 0;
+    for (; *s && n < cap - 4; s++) {
+        wchar_t ch = *s;
+        if ((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || (ch >= L'0' && ch <= L'9') ||
+            ch == L'-' || ch == L'.' || ch == L'_' || ch == L'~') out[n++] = ch;
+        else if (ch < 0x80) { out[n++] = L'%'; out[n++] = hex[ch >> 4]; out[n++] = hex[ch & 15]; }
+    }
+    out[n] = 0;
+}
+
+static void amd_ask(void)
+{
+    DWORD asked = 0, sz = sizeof asked;
+    if (!TV_ASK_AMD_POWER || g_gpuVendor != 0x1002 || !TV_UPDATE_REPO[0]) return;
+    RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"AmdPowerAsked", RRF_RT_REG_DWORD, NULL, &asked, &sz);
+    if (asked) return;
+    if (screen_busy()) { SetTimer(g_wnd, TIMER_AMD_ASK, 60 * 1000, NULL); return; }   /* not over a game */
+
+    wchar_t now[80] = L"";
+    if ((g_mask & (1u << M_GPUP)) && g_ok[M_GPUP])
+        wsprintfW(now, L" Right now it reads %d W.", (int)(g_val[M_GPUP] + 0.5));
+    wchar_t body[700];
+    wsprintfW(body,
+        L"GPU power on AMD Radeon cards is new in TrayVitals, and we couldn't test it on every card.%s\n\n"
+        L"Could you compare it with AMD Software (Alt+R > Performance > Metrics), once while idle and once in a "
+        L"game, and send us both numbers? It takes a minute and helps fix it for everyone with your card.\n\n"
+        L"Report on GitHub opens a short form in your browser, with your card already filled in.", now);
+    UIBTN b[3] = { { 100, L"Report on GitHub" }, { 101, L"Later" }, { 102, L"Don't ask again" } };
+    int r = ui_dialog(L"Does GPU power look right on your Radeon?", body, b, 3, UI_QUESTION | UI_SOLID);
+    if (r == 100 || r == 102) {   /* "Later", Esc or closing asks again next time TrayVitals starts */
+        asked = 1;
+        RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"AmdPowerAsked", REG_DWORD, &asked, sizeof asked);
+    }
+    if (r == 100) {
+        wchar_t gpu[200], raw[32], tv[100], url[600];
+        url_enc(gpu, 200, g_gpuName);
+        lstrcpyW(raw, L"Not shown");
+        if ((g_mask & (1u << M_GPUP)) && g_ok[M_GPUP]) wsprintfW(raw, L"%d W", (int)(g_val[M_GPUP] + 0.5));
+        url_enc(tv, 100, raw);
+        wsprintfW(url, L"https://github.com/" TV_UPDATE_REPO L"/issues/new?template=amd_power.yml&gpu=%s&version="
+                  TV_VERSION L"&reading=%s", gpu, tv);
+        ShellExecuteW(NULL, L"open", url, NULL, NULL, SW_SHOWNORMAL);
+    }
+}
+
 /* ---- In-app update: swapping in the new program ---- */
 #define UNKEY_TV L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\TrayVitals"
 
@@ -3176,6 +3235,15 @@ static void preview_popups(void)
                 L"Install and turn on", L"Not now", UI_QUESTION)) return;
     ui_ask(L"Couldn't download the update", L"Check your internet connection. Open the download page instead?",
            L"Open download page", L"Close", UI_WARN | UI_SOLID);
+    /* The AMD power question, as Radeon users see it (it never shows by itself in a preview). */
+    UIBTN ab[3] = { { 100, L"Report on GitHub" }, { 101, L"Later" }, { 102, L"Don't ask again" } };
+    ui_dialog(L"Does GPU power look right on your Radeon?",
+              L"GPU power on AMD Radeon cards is new in TrayVitals, and we couldn't test it on every card. "
+              L"Right now it reads 187 W.\n\n"
+              L"Could you compare it with AMD Software (Alt+R > Performance > Metrics), once while idle and once in a "
+              L"game, and send us both numbers? It takes a minute and helps fix it for everyone with your card.\n\n"
+              L"Report on GitHub opens a short form in your browser, with your card already filled in.",
+              ab, 3, UI_QUESTION | UI_SOLID);
 }
 
 static LRESULT CALLBACK barproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
@@ -3239,6 +3307,11 @@ static LRESULT CALLBACK wndproc(HWND w, UINT msg, WPARAM wp, LPARAM lp)
         if (wp == TIMER_UPD_NOTICE) {
             KillTimer(w, wp);
             if (g_upd.ver[0]) upd_notice();
+            return 0;
+        }
+        if (wp == TIMER_AMD_ASK) {
+            KillTimer(w, wp);
+            amd_ask();
             return 0;
         }
         break;
@@ -3389,6 +3462,9 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE prev, LPSTR cmd, int show)
     refresh(1);
     notes_after_update();
     if (g_mode == MODE_TRAY) SetTimer(g_wnd, TIMER_TRAYCHECK_START, 3000, NULL);
+#ifndef TV_PREVIEW
+    if (TV_ASK_AMD_POWER && g_gpuVendor == 0x1002) SetTimer(g_wnd, TIMER_AMD_ASK, AMD_ASK_DELAY_MS, NULL);
+#endif
     upd_cleanup();
     upd_old_cleanup();
     upd_schedule(60 * 1000);   /* first check a minute after starting, so it never slows down sign-in */

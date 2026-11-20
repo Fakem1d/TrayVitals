@@ -3,9 +3,9 @@
    When changing it, also add a section at the top of TrayVitals/patchnotes.h. */
 #define TV_VER_MAJOR 1
 #define TV_VER_MINOR 11
-#define TV_VER_PATCH 2
-#define TV_VERSION_A "1.11.2"
-#define TV_VERSION   L"1.11.2"
+#define TV_VER_PATCH 3
+#define TV_VERSION_A "1.11.3"
+#define TV_VERSION   L"1.11.3"
 
 /* Where TrayVitals looks for new versions: a GitHub repository, written "owner/name".
    Publish each version there as a release tagged like v1.9.0 (the same number as above); the

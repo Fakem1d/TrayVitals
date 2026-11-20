@@ -1,0 +1,76 @@
+name: AMD Radeon GPU power check
+description: Compare TrayVitals' GPU power with AMD Software on your Radeon card. It helps us get it right for every card.
+title: "[AMD power] "
+labels: ["amd-power"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping! GPU power on AMD Radeon cards is new in TrayVitals, and we couldn't test it on every card.
+        **How to compare:** press **Alt+R** to open AMD Software, go to **Performance > Metrics**, and look at the GPU power (it may say *Total Board Power*). Note it next to the GPU power on TrayVitals' taskbar label, once while idle and once in a game.
+
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card
+      description: Filled in by TrayVitals. Fix it if it's wrong.
+      placeholder: "AMD Radeon RX 7800 XT"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: TrayVitals version
+      placeholder: "1.11.3"
+    validations:
+      required: true
+
+  - type: input
+    id: reading
+    attributes:
+      label: What TrayVitals showed when you clicked "Report on GitHub"
+      placeholder: "187 W"
+
+  - type: input
+    id: idle
+    attributes:
+      label: "While idle: TrayVitals / AMD Software"
+      description: The desktop, nothing running.
+      placeholder: "12 W / 14 W"
+    validations:
+      required: true
+
+  - type: input
+    id: game
+    attributes:
+      label: "In a game: TrayVitals / AMD Software"
+      description: Both read at about the same moment.
+      placeholder: "240 W / 263 W"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: How close is it?
+      options:
+        - Matches (within a few watts)
+        - Always a bit lower or higher
+        - Very different
+        - TrayVitals shows no GPU power
+    validations:
+      required: true
+
+  - type: input
+    id: driver
+    attributes:
+      label: AMD Software (driver) version
+      description: "AMD Software > the gear icon (Settings) > System."
+      placeholder: "25.11.1"
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: A screenshot of AMD Software's metrics next to TrayVitals helps a lot. Drag it into this box.

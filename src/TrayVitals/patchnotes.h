@@ -1,6 +1,11 @@
 /* Patch notes shown in the "What's new" window (once after an update, and from the menu).
    Newest version first. Each version is one block: its header line, then lines starting with "\x2022 ". */
 static const wchar_t PATCH_NOTES[] =
+    L"1.11.3\r\n"
+    L"\x2022 For AMD Radeon users: TrayVitals asks once whether GPU power looks right, and if you like, opens a "
+    L"short form on GitHub to compare it with AMD Software. It never shows during a game, and \"Don't ask again\" "
+    L"means exactly that.\r\n"
+    L"\r\n"
     L"1.11.2\r\n"
     L"\x2022 Setup now puts the license files (LICENSE.txt and LICENSE-NONCOMMERCIAL.md) in the TrayVitals folder, "
     L"next to the program, and uninstalling removes them again.\r\n"
