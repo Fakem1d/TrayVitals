@@ -2434,10 +2434,17 @@ static void url_enc(wchar_t *out, int cap, const wchar_t *s)
     out[n] = 0;
 }
 
+/* Cards whose GPU power is already confirmed: these aren't asked any more.
+   Radeon RX 9000 (RX 9060 / 9070): matches AMD Software within a few watts (RX 9070 XT, 1.11.3). */
+static int amd_confirmed(void)
+{
+    return wcsstr(g_gpuName, L"RX 90") != NULL;
+}
+
 static void amd_ask(void)
 {
     DWORD asked = 0, sz = sizeof asked;
-    if (!TV_ASK_AMD_POWER || g_gpuVendor != 0x1002 || !TV_UPDATE_REPO[0]) return;
+    if (!TV_ASK_AMD_POWER || g_gpuVendor != 0x1002 || !TV_UPDATE_REPO[0] || amd_confirmed()) return;
     RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"AmdPowerAsked", RRF_RT_REG_DWORD, NULL, &asked, &sz);
     if (asked) return;
     if (screen_busy()) { SetTimer(g_wnd, TIMER_AMD_ASK, 60 * 1000, NULL); return; }   /* not over a game */
@@ -3463,7 +3470,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE prev, LPSTR cmd, int show)
     notes_after_update();
     if (g_mode == MODE_TRAY) SetTimer(g_wnd, TIMER_TRAYCHECK_START, 3000, NULL);
 #ifndef TV_PREVIEW
-    if (TV_ASK_AMD_POWER && g_gpuVendor == 0x1002) SetTimer(g_wnd, TIMER_AMD_ASK, AMD_ASK_DELAY_MS, NULL);
+    if (TV_ASK_AMD_POWER && g_gpuVendor == 0x1002 && !amd_confirmed()) SetTimer(g_wnd, TIMER_AMD_ASK, AMD_ASK_DELAY_MS, NULL);
 #endif
     upd_cleanup();
     upd_old_cleanup();
