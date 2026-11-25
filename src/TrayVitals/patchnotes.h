@@ -1,6 +1,15 @@
 /* Patch notes shown in the "What's new" window (once after an update, and from the menu).
    Newest version first. Each version is one block: its header line, then lines starting with "\x2022 ". */
 static const wchar_t PATCH_NOTES[] =
+    L"1.12.0\r\n"
+    L"\x2022 New: network speed. Download and upload on the taskbar, with a red \x2193 and a blue \x2191, in KB/s and MB/s "
+    L"or Kbps and Mbps. Turn on Net download and Net upload in the menu; the menu then lets you pick the units and "
+    L"the arrows' colors (red and blue, green and orange, purple and teal, or plain).\r\n"
+    L"\x2022 New: warning colors for usage. Like the temperatures, CPU, GPU, RAM and VRAM usage turn yellow when high "
+    L"(85%) and red when very high (95%). You can turn this off in the menu.\r\n"
+    L"\x2022 New: stack numbers in two rows, per group. In the menu under Stack, pick CPU, GPU and/or Network: that "
+    L"group's numbers sit above each other (usage above temperature, download above upload) and take less room.\r\n"
+    L"\r\n"
     L"1.11.4\r\n"
     L"\x2022 GPU power on Radeon RX 9000 cards (RX 9060 and RX 9070) is confirmed: it matches AMD Software within "
     L"a few watts. Thanks for the report! These cards aren't asked about it any more; older Radeon cards still are.\r\n"

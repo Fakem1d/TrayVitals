@@ -1,9 +1,13 @@
 #define _WIN32_WINNT 0x0A00
+#define NTDDI_VERSION 0x0A000000   /* Windows 10: needed for the network adapter API (netioapi.h) */
 #define WIN32_LEAN_AND_MEAN
 #define COBJMACROS
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
+#include <winsock2.h>
+#include <ws2ipdef.h>
+#include <iphlpapi.h>   /* network adapters' byte counters (GetIfTable2), for network speed */
 #include <shellapi.h>
 #include <pdh.h>
 #include <pdhmsg.h>
@@ -179,24 +183,41 @@ static DWORD g_menuStyle = TV_MENU_MODERN ? 0 : 1;   /* 0: modern panel, 1: Wind
 static const int LABEL_ALPHA_PCT[4] = { 100, 85, 70, 55 };
 
 /* New sensors go at the end: each one's bit in the saved "Mask2" setting must not move. */
-enum { M_CPU, M_CPUT, M_RAM, M_GPU, M_GPUT, M_VRAM, M_DISKT, M_CPUP, M_GPUP, M_N };
+enum { M_CPU, M_CPUT, M_RAM, M_GPU, M_GPUT, M_VRAM, M_DISKT, M_CPUP, M_GPUP, M_NETD, M_NETU, M_N };
 static const wchar_t *NAMES[M_N] = { L"CPU usage", L"CPU temperature", L"RAM usage",
                                      L"GPU usage", L"GPU temperature", L"VRAM usage", L"SSD temperature",
-                                     L"CPU power", L"GPU power" };
+                                     L"CPU power", L"GPU power", L"Net download", L"Net upload" };
 /* Order sensors are listed in the menu and added to the tray. */
-static const int ORDER[M_N] = { M_CPU, M_CPUT, M_CPUP, M_RAM, M_GPU, M_GPUT, M_GPUP, M_VRAM, M_DISKT };
+static const int ORDER[M_N] = { M_CPU, M_CPUT, M_CPUP, M_RAM, M_GPU, M_GPUT, M_GPUP, M_VRAM, M_DISKT, M_NETD, M_NETU };
 #define MASK_POWER ((1u << M_CPUP) | (1u << M_GPUP))
+#define MASK_NET   ((1u << M_NETD) | (1u << M_NETU))   /* network speed: off until switched on in the menu */
+#define IS_NET(m)  ((m) == M_NETD || (m) == M_NETU)    /* not offered for the small tray icon (too long for it) */
 #define MASK_VER   2   /* settings saved before version 2 didn't know the power sensors */
 
 static const COLORREF COL_D[M_N] = { RGB(80,190,255), 0, RGB(185,145,255), RGB(118,215,90), 0, RGB(118,215,90), 0,
-                                     RGB(80,190,255), RGB(118,215,90) };
+                                     RGB(80,190,255), RGB(118,215,90), RGB(255,90,80), RGB(80,170,255) };
 static const COLORREF COL_L[M_N] = { RGB(0,100,180),  0, RGB(110,60,200),  RGB(35,135,30),  0, RGB(35,135,30), 0,
-                                     RGB(0,100,180),  RGB(35,135,30) };
+                                     RGB(0,100,180),  RGB(35,135,30),  RGB(200,30,30), RGB(0,100,200) };
 
 static HWND     g_wnd;
 static UINT     g_taskbarCreated;
 static UINT     g_showMenuMsg;   /* sent by a second launch: open the menu (it may be the only way to reach it) */
-static DWORD    g_mask = (1u << M_N) - 1, g_interval = 2000;
+static DWORD    g_mask = ((1u << M_N) - 1) & ~MASK_NET, g_interval = 2000;
+static DWORD    g_netBits;   /* network speed in 0: KB/s and MB/s, 1: Kbps and Mbps ("NetUnits") */
+static DWORD    g_netColors; /* the network arrows' colors, from NET_COLORS ("NetColors") */
+static DWORD    g_warnUsage = 1;   /* usage turns yellow when high, red when very high ("WarnUsage") */
+
+/* Colors for the download / upload arrows: dark taskbar, then light taskbar. */
+#define NET_COLOR_N 4
+static const struct { const wchar_t *name, *chip; COLORREF dn, up, dnL, upL; } NET_COLORS[NET_COLOR_N] = {
+    { L"Red / blue",     L"Red",    RGB(255,90,80),   RGB(80,170,255),  RGB(200,30,30),  RGB(0,100,200) },
+    { L"Green / orange", L"Green",  RGB(118,215,90),  RGB(255,170,55),  RGB(35,135,30),  RGB(195,95,0) },
+    { L"Purple / teal",  L"Purple", RGB(185,145,255), RGB(70,210,200),  RGB(110,60,200), RGB(0,130,120) },
+    { L"Plain",          L"Plain",  0, 0, 0, 0 },   /* the text color */
+};
+/* Usage warning levels (CPU, GPU, RAM and VRAM usage), in percent. */
+#define USE_HIGH 85
+#define USE_CRIT 95
 static double   g_val[M_N];
 static int      g_ok[M_N], g_size, g_light;
 static wchar_t  g_gpuName[64];
@@ -841,8 +862,66 @@ static void build_query(void)
     PdhCollectQueryData(g_q);
 }
 
+/* Network speed: bytes per second in and out, from the counters of the PC's real network adapters
+   (Ethernet, Wi-Fi). Virtual ones (VPNs, Hyper-V, WSL) and Windows' filter layers are skipped: they
+   carry the same traffic again, so counting them would show it twice. */
+typedef DWORD (WINAPI *PFN_GETIFTABLE2)(PMIB_IF_TABLE2 *);
+typedef void  (WINAPI *PFN_FREEMIBTABLE)(PVOID);
+static void read_net(void)
+{
+    static PFN_GETIFTABLE2 getTable;
+    static PFN_FREEMIBTABLE freeTable;
+    static int loaded;
+    static ULONGLONG lastT, lastIn, lastOut;
+    if (!loaded) {
+        HMODULE m = sysdll(L"iphlpapi.dll");
+        loaded = 1;
+        if (m) {
+            getTable  = (PFN_GETIFTABLE2)(void *)GetProcAddress(m, "GetIfTable2");
+            freeTable = (PFN_FREEMIBTABLE)(void *)GetProcAddress(m, "FreeMibTable");
+        }
+    }
+    PMIB_IF_TABLE2 t = NULL;
+    if (!getTable || !freeTable || getTable(&t) != NO_ERROR || !t) { g_ok[M_NETD] = g_ok[M_NETU] = 0; return; }
+    ULONGLONG in = 0, out = 0;
+    for (ULONG i = 0; i < t->NumEntries; i++) {
+        MIB_IF_ROW2 *r = &t->Table[i];
+        if (!r->InterfaceAndOperStatusFlags.HardwareInterface || r->InterfaceAndOperStatusFlags.FilterInterface ||
+            r->Type == IF_TYPE_SOFTWARE_LOOPBACK || r->OperStatus != IfOperStatusUp) continue;
+        in += r->InOctets; out += r->OutOctets;
+    }
+    freeTable(t);
+    ULONGLONG now = GetTickCount64();
+    if (lastT && now > lastT && now - lastT < 30000 && in >= lastIn && out >= lastOut) {
+        double s = (now - lastT) / 1000.0;
+        g_val[M_NETD] = (in - lastIn) / s;  g_ok[M_NETD] = 1;
+        g_val[M_NETU] = (out - lastOut) / s; g_ok[M_NETU] = 1;
+    }
+    lastT = now; lastIn = in; lastOut = out;   /* an adapter that came or went: just start over */
+}
+
+/* "12 KB/s", "3.4 MB/s", or with g_netBits "850 Kbps", "48 Mbps". */
+static void net_fmt(wchar_t *t, int cap, double bytes)
+{
+    if (g_netBits) {
+        double k = bytes * 8 / 1000;   /* kilobits */
+        if (k < 1000)        _snwprintf(t, cap, L"%d Kbps", (int)(k + 0.5));
+        else if (k < 9995)   _snwprintf(t, cap, L"%.1f Mbps", k / 1000);
+        else if (k < 999500) _snwprintf(t, cap, L"%d Mbps", (int)(k / 1000 + 0.5));
+        else                 _snwprintf(t, cap, L"%.1f Gbps", k / 1e6);
+    } else {
+        double k = bytes / 1024;       /* kilobytes */
+        if (k < 999.5)               _snwprintf(t, cap, L"%d KB/s", (int)(k + 0.5));
+        else if (k < 10235)          _snwprintf(t, cap, L"%.1f MB/s", k / 1024);
+        else if (k < 1024.0 * 999.5) _snwprintf(t, cap, L"%d MB/s", (int)(k / 1024 + 0.5));
+        else                         _snwprintf(t, cap, L"%.1f GB/s", k / (1024.0 * 1024));
+    }
+    t[cap - 1] = 0;
+}
+
 static void sample(void)
 {
+    if (g_mask & MASK_NET) read_net();
     if (g_mask & (1u << M_CPU)) read_cpu();
     if (g_mask & (1u << M_RAM)) read_ram();
     if (g_q && PdhCollectQueryData(g_q) == ERROR_SUCCESS) {
@@ -869,9 +948,9 @@ static void sample(void)
 }
 
 enum { SH_CPU, SH_RAM, SH_GPU };
-static const int SHAPE[M_N]  = { SH_CPU, SH_CPU, SH_RAM, SH_GPU, SH_GPU, SH_RAM, SH_RAM, SH_CPU, SH_GPU };
-static const int ISTEMP[M_N] = { 0, 1, 0, 0, 1, 0, 1, 0, 0 };
-static const int ISPWR[M_N]  = { 0, 0, 0, 0, 0, 0, 0, 1, 1 };   /* watts, not a 0-100 % value */
+static const int SHAPE[M_N]  = { SH_CPU, SH_CPU, SH_RAM, SH_GPU, SH_GPU, SH_RAM, SH_RAM, SH_CPU, SH_GPU, SH_RAM, SH_RAM };
+static const int ISTEMP[M_N] = { 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0 };
+static const int ISPWR[M_N]  = { 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0 };   /* watts, not a 0-100 % value */
 #define SS 4
 static HDC   g_ldc;
 static int   g_S;
@@ -1085,8 +1164,8 @@ static wchar_t g_trayTxt[4], g_trayTip[128];
 
 static int tray_metric(void)
 {
-    if ((g_mask >> g_trayShows) & 1) return (int)g_trayShows;
-    for (int o = 0; o < M_N; o++) if ((g_mask >> ORDER[o]) & 1) return ORDER[o];
+    if (((g_mask >> g_trayShows) & 1) && !IS_NET(g_trayShows)) return (int)g_trayShows;
+    for (int o = 0; o < M_N; o++) if (((g_mask >> ORDER[o]) & 1) && !IS_NET(ORDER[o])) return ORDER[o];
     return M_CPU;
 }
 
@@ -1094,18 +1173,21 @@ static int tray_metric(void)
 static void tray_tip(wchar_t *t)
 {
     static const int GROUP[][4] = { { M_CPU, M_CPUT, M_CPUP, -1 }, { M_RAM, -1 }, { M_GPU, M_GPUT, M_GPUP, -1 },
-                                    { M_VRAM, -1 }, { M_DISKT, -1 } };
-    static const wchar_t *LBL[] = { L"CPU", L"RAM", L"GPU", L"VRAM", L"SSD" };
+                                    { M_VRAM, -1 }, { M_DISKT, -1 }, { M_NETD, M_NETU, -1 } };
+    static const wchar_t *LBL[] = { L"CPU", L"RAM", L"GPU", L"VRAM", L"SSD", L"Net" };
     int o = 0;
     t[0] = 0;
-    for (int g = 0; g < 5; g++) {
+    for (int g = 0; g < 6; g++) {
         wchar_t line[48]; int lo = 0, any = 0;
         lo = _snwprintf(line, 48, L"%s", LBL[g]);
         for (int i = 0; GROUP[g][i] >= 0; i++) {
             int m = GROUP[g][i];
             if (!((g_mask >> m) & 1)) continue;
             any = 1;
+            wchar_t nv[24] = L"";
+            if (IS_NET(m) && g_ok[m]) net_fmt(nv, 24, g_val[m]);
             int n = !g_ok[m] ? _snwprintf(line + lo, 48 - lo, L" --")
+                  : IS_NET(m) ? _snwprintf(line + lo, 48 - lo, L" %s %s", m == M_NETD ? L"\x2193" : L"\x2191", nv)
                   : ISTEMP[m] ? _snwprintf(line + lo, 48 - lo, L" %.0f\x00B0", g_val[m])
                   : ISPWR[m]  ? _snwprintf(line + lo, 48 - lo, L" %.0f W", g_val[m])
                   : m == M_RAM ? _snwprintf(line + lo, 48 - lo, L" %.0f%% (%.1f/%.0f GB)", g_val[m], g_ramUsed, g_ramTotal)
@@ -1184,7 +1266,8 @@ static volatile LONG g_scanFails;   /* failed measurements in a row */
 static volatile LONG g_scanNoUia;   /* this taskbar can't be measured (e.g. Windows 10): use window fallback */
 static HANDLE        g_scanWake;
 
-typedef struct { int glyph, sh, x, y, w, al, f, row; wchar_t t[8]; COLORREF c; } SEG;
+/* arrow: t starts with a network arrow, drawn in ac; aw is its width (set by layout). */
+typedef struct { int glyph, sh, x, y, w, al, f, row, arrow, aw, st; wchar_t t[16]; COLORREF c, ac; } SEG;   /* st: in two rows */
 enum { G_CPU, G_RAM, G_GPU, G_DISK };
 
 static int SC(int v) { return MulDiv(v, g_dpi, 96); }
@@ -1305,6 +1388,10 @@ static void bar_destroy(void)
 }
 
 static int g_compact, g_wideW, g_compW;
+static DWORD g_stacked;   /* groups whose numbers are in two rows: STACK_CPU, STACK_GPU, STACK_NET ("Stacked") */
+#define STACK_CPU 1
+#define STACK_GPU 2
+#define STACK_NET 4
 static IUIAutomation *g_uia;
 static IUIAutomationCacheRequest *g_uiaCache;
 static IUIAutomationCondition *g_uiaAll;
@@ -1506,6 +1593,11 @@ static void seg_pct(SEG *s, int m, COLORREF fg)
     if (!g_ok[m]) lstrcpyW(s->t, L"--");
     else _snwprintf(s->t, 8, L"%d%%", (int)(g_val[m] + 0.5));
     s->t[7] = 0;
+    /* like the temperatures: yellow when high, red when very high */
+    if (g_warnUsage && g_ok[m]) {
+        if (g_val[m] >= USE_CRIT) s->c = g_light ? RGB(200, 25, 25) : RGB(255, 75, 65);
+        else if (g_val[m] >= USE_HIGH) s->c = g_light ? RGB(195, 95, 0) : RGB(255, 170, 55);
+    }
 }
 static void seg_temp(SEG *s, int m, COLORREF fg)
 {
@@ -1526,6 +1618,20 @@ static void seg_label(SEG *s, const wchar_t *t, COLORREF fg)
 {
     s->glyph = 0; s->c = fg; s->al = 150;
     lstrcpynW(s->t, t, 8);
+}
+/* Network speed: a colored arrow (red down = download, blue up = upload), then the speed. */
+static void seg_net(SEG *s, int m, COLORREF fg)
+{
+    wchar_t v[14];
+    s->glyph = 0; s->c = fg; s->al = 255;
+    DWORD k = g_netColors < NET_COLOR_N ? g_netColors : 0;
+    s->arrow = 1; s->st = (g_stacked & STACK_NET) != 0;
+    s->ac =k == NET_COLOR_N - 1 ? fg
+          : m == M_NETD ? (g_light ? NET_COLORS[k].dnL : NET_COLORS[k].dn) : (g_light ? NET_COLORS[k].upL : NET_COLORS[k].up);
+    if (!g_ok[m]) lstrcpyW(v, L"--");
+    else net_fmt(v, 14, g_val[m]);
+    _snwprintf(s->t, 16, L"%s %s", m == M_NETD ? L"\x2193" : L"\x2191", v);
+    s->t[15] = 0;
 }
 
 static void draw_gpu(HDC dc, int x0, int y0, int sz)
@@ -1612,41 +1718,57 @@ static int text_w(HDC dc, const wchar_t *t)
     return s.cx;
 }
 
+/* A network speed's width: just what its text needs. The speeds sit at the labels' free end (see bar_draw),
+   so only they move as the numbers change. */
+static int net_w(HDC dc, const wchar_t *t, int compact)
+{
+    (void)compact;
+    return text_w(dc, t);
+}
+/* Places the segments. compact: everything in two rows with the small font (too little room). Otherwise
+   each group of numbers is side by side, or in two rows if that group is stacked (sg[].st, "Stacked"). */
 static int layout(HDC dc, SEG *sg, int n, int compact, int HB)
 {
-    int gs = SC(16) * SS, top, h, d1, d2, X = SC(4) * SS;
-    if (!compact) {
-        SelectObject(dc, g_barFont);
-        ink(dc, L'0', &top, &h, &d1, &d2);
-        for (int i = 0; i < n; i++) {
-            if (sg[i].glyph) { if (i) X += SC(14) * SS; sg[i].w = gs; }
-            else {
-                X += (sg[i - 1].glyph ? SC(6) : sg[i].al < 255 ? SC(9) : sg[i - 1].al < 255 ? SC(4) : SC(5)) * SS;
-                sg[i].w = text_w(dc, sg[i].t);
-                sg[i].y = HB / 2 - (top + h / 2);
-                sg[i].f = 0; sg[i].row = -1;
-            }
-            sg[i].x = X; X += sg[i].w;
-        }
-        return X + SC(4) * SS;
-    }
-    SelectObject(dc, g_smallFont);
+    int gs = SC(16) * SS, top, h, sTop, sH, d1, d2, X = SC(4) * SS;
+    SelectObject(dc, g_barFont);
     ink(dc, L'0', &top, &h, &d1, &d2);
-    int gap = SC(3) * SS, yTop = HB / 2 - gap / 2 - h - top, yBot = HB / 2 + gap / 2 - top, yMid = HB / 2 - h / 2 - top;
+    SelectObject(dc, g_smallFont);
+    ink(dc, L'0', &sTop, &sH, &d1, &d2);
+    int gap = SC(3) * SS, yTop = HB / 2 - gap / 2 - sH - sTop, yBot = HB / 2 + gap / 2 - sTop, yMid = HB / 2 - sH / 2 - sTop;
     for (int i = 0; i < n;) {
         if (sg[i].glyph) {
-            if (i) X += SC(10) * SS;
+            if (i) X += (compact ? SC(10) : SC(14)) * SS;
             sg[i].x = X; sg[i].w = gs; X += gs;
             i++;
             continue;
         }
-        int a = i, b = (i + 1 < n && !sg[i + 1].glyph && sg[i + 1].al == 255) ? i + 1 : -1;
-        X += (sg[a - 1].glyph ? SC(5) : SC(7)) * SS;
-        int wa = text_w(dc, sg[a].t), wb = b >= 0 ? text_w(dc, sg[b].t) : 0;
+        /* a stacked group's number with nothing to go below it stays normal size, unless everything is compact */
+        int partner = i + 1 < n && !sg[i + 1].glyph && sg[i + 1].st && sg[i + 1].al == 255 && sg[i + 1].arrow == sg[i].arrow;
+        if (!compact && (!sg[i].st || !partner)) {   /* side by side, normal font */
+            SelectObject(dc, g_barFont);
+            X += (!i ? 0 : sg[i].arrow ? SC(14) : sg[i - 1].glyph ? SC(6) : sg[i].al < 255 ? SC(9) :
+                  sg[i - 1].al < 255 ? SC(4) : SC(5)) * SS;
+            sg[i].w = sg[i].arrow ? net_w(dc, sg[i].t, 0) : text_w(dc, sg[i].t);
+            if (sg[i].arrow) { wchar_t ar[2] = { sg[i].t[0], 0 }; sg[i].aw = text_w(dc, ar); }
+            sg[i].y = HB / 2 - (top + h / 2);
+            sg[i].f = 0; sg[i].row = -1;
+            sg[i].x = X; X += sg[i].w;
+            i++;
+            continue;
+        }
+        /* two rows, small font: this segment on top, the next one of the same kind below it */
+        SelectObject(dc, g_smallFont);
+        int a = i, b = (i + 1 < n && !sg[i + 1].glyph && (compact || sg[i + 1].st) && sg[i + 1].al == 255 &&
+                        sg[i + 1].arrow == sg[a].arrow) ? i + 1 : -1;
+        X += (!a ? 0 : sg[a].arrow && !sg[a - 1].arrow ? SC(compact ? 10 : 14) : sg[a - 1].glyph ? SC(5) : SC(7)) * SS;
+        int wa = sg[a].arrow ? net_w(dc, sg[a].t, 1) : text_w(dc, sg[a].t), wb = b < 0 ? 0 : sg[b].arrow ? net_w(dc, sg[b].t, 1) : text_w(dc, sg[b].t);
+        for (int k = a; k <= (b >= 0 ? b : a); k++)
+            if (sg[k].arrow) { wchar_t ar[2] = { sg[k].t[0], 0 }; sg[k].aw = text_w(dc, ar); }
         sg[a].x = X; sg[a].w = wa; sg[a].f = 1;
         if (b >= 0) {
             sg[a].y = yTop; sg[a].row = 0;
             sg[b].x = X; sg[b].w = wb; sg[b].f = 1; sg[b].y = yBot; sg[b].row = 1;
+            if (sg[a].arrow && sg[b].arrow) sg[a].w = sg[b].w = wa > wb ? wa : wb;   /* same width: speeds right-align */
         } else { sg[a].y = yMid; sg[a].row = -1; }
         X += wa > wb ? wa : wb;
         i = b >= 0 ? b + 1 : a + 1;
@@ -1669,13 +1791,20 @@ static void bar_draw(int force)
     COLORREF fg = g_light ? RGB(0, 0, 0) : RGB(255, 255, 255);
 
     SEG sg[20]; int n = 0;
+    ZeroMemory(sg, sizeof sg);
+    int netFirst = g_align == ALIGN_RIGHT;
+    if (netFirst)
+        for (int m = M_NETD; m <= M_NETU; m++)
+            if (g_mask & (1u << m)) seg_net(&sg[n++], m, fg);
     int cpuT = (g_mask & (1u << M_CPUT)) && g_ok[M_CPUT];
     int cpuP = (g_mask & (1u << M_CPUP)) && g_ok[M_CPUP];
     if ((g_mask & (1u << M_CPU)) || cpuT || cpuP) {
         sg[n].glyph = 1; sg[n].sh = G_CPU; n++;
+        int s0 = n;
         if (g_mask & (1u << M_CPU)) seg_pct(&sg[n++], M_CPU, fg);
         if (cpuT) seg_temp(&sg[n++], M_CPUT, fg);
         if (cpuP) seg_power(&sg[n++], M_CPUP, fg);
+        for (int k = s0; k < n; k++) sg[k].st = (g_stacked & STACK_CPU) != 0;
     }
     if (g_mask & (1u << M_RAM)) {
         sg[n].glyph = 1; sg[n].sh = G_RAM; n++;
@@ -1685,6 +1814,7 @@ static void bar_draw(int force)
     int gpuP = (g_mask & (1u << M_GPUP)) && g_ok[M_GPUP];
     if ((g_mask & ((1u << M_GPU) | (1u << M_VRAM))) || gpuT || gpuP) {
         sg[n].glyph = 1; sg[n].sh = G_GPU; n++;
+        int s0 = n;
         if (g_mask & (1u << M_GPU)) seg_pct(&sg[n++], M_GPU, fg);
         if (gpuT) seg_temp(&sg[n++], M_GPUT, fg);
         if (gpuP) seg_power(&sg[n++], M_GPUP, fg);
@@ -1692,13 +1822,19 @@ static void bar_draw(int force)
             seg_label(&sg[n++], L"VRAM", fg);
             seg_pct(&sg[n++], M_VRAM, fg);
         }
+        for (int k = s0; k < n; k++) sg[k].st = (g_stacked & STACK_GPU) != 0;
     }
     if ((g_mask & (1u << M_DISKT)) && g_ok[M_DISKT]) {
         sg[n].glyph = 1; sg[n].sh = G_DISK; n++;
         seg_temp(&sg[n++], M_DISKT, fg);
     }
+    /* Network speeds: at the end that moves. Against the tray (right) they go first, so as their width
+       changes only they shift and everything else keeps its place; otherwise they go last. */
+    if (!netFirst)
+        for (int m = M_NETD; m <= M_NETU; m++)
+            if (g_mask & (1u << m)) seg_net(&sg[n++], m, fg);
 
-    wchar_t sig[320]; int p = _snwprintf(sig, 320, L"%d|%d|%d|%d|%d|", H, g_dpi, g_light, n, g_compact);
+    wchar_t sig[320]; int p = _snwprintf(sig, 320, L"%d|%d|%d|%d|%d|%lu|", H, g_dpi, g_light, n, g_compact, g_stacked);
     for (int i = 0; i < n && p > 0 && p < 290; i++)
         if (!sg[i].glyph) p += _snwprintf(sig + p, 320 - p, L"%s%06X|", sg[i].t, (unsigned)sg[i].c);
     sig[319] = 0;
@@ -1739,11 +1875,29 @@ static void bar_draw(int force)
     for (int i = 0; i < n; i++) {
         if (sg[i].glyph) continue;
         SelectObject(mdc, sg[i].f ? g_smallFont : g_barFont);
-        TextOutW(mdc, sg[i].x, sg[i].y, sg[i].t, lstrlenW(sg[i].t));
+        if (sg[i].arrow && sg[i].row >= 0) {
+            /* stacked: arrow on the left, speed right-aligned, so download and upload line up */
+            const wchar_t *v = sg[i].t + 1;
+            while (*v == L' ') v++;
+            TextOutW(mdc, sg[i].x, sg[i].y, sg[i].t, 1);
+            TextOutW(mdc, sg[i].x + sg[i].w - text_w(mdc, v), sg[i].y, v, lstrlenW(v));
+        }
+        int ax = 0;   /* where the arrow starts, from x */
+        if (sg[i].arrow && sg[i].row < 0) {
+            /* side by side: pushed right, so any spare room is between the groups, not next to the tray icons */
+            ax = sg[i].w - text_w(mdc, sg[i].t);
+            if (ax < 0) ax = 0;
+            TextOutW(mdc, sg[i].x + ax, sg[i].y, sg[i].t, lstrlenW(sg[i].t));
+        } else if (!sg[i].arrow)
+            TextOutW(mdc, sg[i].x, sg[i].y, sg[i].t, lstrlenW(sg[i].t));
         for (int r = 0; r < 2; r++) {
             if (sg[i].row >= 0 && sg[i].row != r) continue;
             for (int k = sg[i].x / SS - 1; k <= (sg[i].x + sg[i].w) / SS + 1 && k < W; k++)
-                if (k >= 0) { colOf[r][k] = sg[i].c; alOf[r][k] = (BYTE)sg[i].al; }
+                if (k >= 0) {
+                    /* a network arrow's columns get the arrow's color, the speed after it the text color */
+                    colOf[r][k] = sg[i].arrow && k * SS < sg[i].x + ax + sg[i].aw + SS ? sg[i].ac : sg[i].c;
+                    alOf[r][k] = (BYTE)sg[i].al;
+                }
         }
     }
     for (int i = 0; i < n; i++)
@@ -1850,6 +2004,10 @@ static void save(void)
     RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"Glass", REG_DWORD, &g_uiAlpha, sizeof g_uiAlpha);
     RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"LabelOpacity", REG_DWORD, &g_labelAlpha, sizeof g_labelAlpha);
     RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"MenuStyle", REG_DWORD, &g_menuStyle, sizeof g_menuStyle);
+    RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"NetUnits", REG_DWORD, &g_netBits, sizeof g_netBits);
+    RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"NetColors", REG_DWORD, &g_netColors, sizeof g_netColors);
+    RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"WarnUsage", REG_DWORD, &g_warnUsage, sizeof g_warnUsage);
+    RegSetKeyValueW(HKEY_CURRENT_USER, REGKEY, L"Stacked", REG_DWORD, &g_stacked, sizeof g_stacked);
 }
 static void load(void)
 {
@@ -1891,6 +2049,14 @@ static void load(void)
     if (!RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"LabelOpacity", RRF_RT_REG_DWORD, NULL, &v, &sz) && v < 4) g_labelAlpha = v;
     sz = sizeof v;
     if (!RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"MenuStyle", RRF_RT_REG_DWORD, NULL, &v, &sz) && v < 2) g_menuStyle = v;
+    sz = sizeof v;
+    if (!RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"NetUnits", RRF_RT_REG_DWORD, NULL, &v, &sz) && v < 2) g_netBits = v;
+    sz = sizeof v;
+    if (!RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"NetColors", RRF_RT_REG_DWORD, NULL, &v, &sz) && v < NET_COLOR_N) g_netColors = v;
+    sz = sizeof v;
+    if (!RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"WarnUsage", RRF_RT_REG_DWORD, NULL, &v, &sz) && v < 2) g_warnUsage = v;
+    sz = sizeof v;
+    if (!RegGetValueW(HKEY_CURRENT_USER, REGKEY, L"Stacked", RRF_RT_REG_DWORD, NULL, &v, &sz) && v < 8) g_stacked = v;
 }
 static int is_admin(void)
 {
@@ -2935,13 +3101,22 @@ static void menu_cmd(int cmd)
         /* Windows hides new tray icons; check shortly, once Windows has registered the icon. */
         if (g_mode == MODE_TRAY) SetTimer(g_wnd, TIMER_TRAYCHECK, 1500, NULL);
     }
-    else if (cmd >= 360 && cmd < 360 + M_N) {
+    else if (cmd >= 360 && cmd < 360 + M_NETD) {   /* network readings are never the small icon; 369+ are other commands */
         g_trayShows = (DWORD)(cmd - 360);
         g_iconDrop = 0;
         refresh(1);
         save();
     }
     else if (cmd == CMD_ICONDROP) g_iconDrop = !g_iconDrop;
+    else if (cmd == 205 || cmd == 206) { g_netBits = (DWORD)(cmd - 205); refresh(1); save(); }
+    else if (cmd >= 210 && cmd < 210 + NET_COLOR_N) { g_netColors = (DWORD)(cmd - 210); refresh(1); save(); }
+    else if (cmd == 215) { g_warnUsage = !g_warnUsage; refresh(1); save(); }
+    else if (cmd >= 216 && cmd <= 218) {   /* stack one group's numbers in two rows, or not */
+        g_stacked ^= 1u << (cmd - 216);
+        save();
+        refresh(1);
+        SetEvent(g_scanWake);   /* its width changed: place the labels again */
+    }
     else if (cmd == CMD_STYLE || cmd == CMD_STYLE + 1) {
         g_menuStyle = (DWORD)(cmd - CMD_STYLE);
         save();
@@ -2996,7 +3171,7 @@ static PITEM *pi_add(PITEM *it, int *n, int max, int type, const wchar_t *text, 
 }
 static void pi_chip(PITEM *p, const wchar_t *t, int cmd, int on)
 {
-    if (p->nch >= 10) return;
+    if (p->nch >= (int)(sizeof p->ch / sizeof p->ch[0])) return;
     PCHIP *c = &p->ch[p->nch++];
     lstrcpynW(c->t, t, 28); c->cmd = cmd; c->on = on;
 }
@@ -3027,6 +3202,10 @@ static int menu_build(PITEM *it, int max)
     p = pi_add(it, &n, max, PI_TOGGLE, L"Big labels on taskbar", 310, 1);
     p->on = g_mode == MODE_BAR;
     if (g_mode == MODE_BAR) {
+        p = pi_add(it, &n, max, PI_CHIPS, L"Stack", 0, 1);   /* each group's numbers in two rows, or side by side */
+        pi_chip(p, L"CPU", 216, (g_stacked & STACK_CPU) != 0);
+        pi_chip(p, L"GPU", 217, (g_stacked & STACK_GPU) != 0);
+        if (g_mask & MASK_NET) pi_chip(p, L"Network", 218, (g_stacked & STACK_NET) != 0);
         p = pi_add(it, &n, max, PI_CHIPS, L"Align", 0, 1);
         pi_chip(p, L"Left", 340, g_align == ALIGN_LEFT);
         pi_chip(p, L"Center", 341, g_align == ALIGN_CENTER);
@@ -3062,9 +3241,18 @@ static int menu_build(PITEM *it, int max)
         p = pi_add(it, &n, max, PI_LIST, NULL, 0, 1);
         for (int o = 0; o < M_N; o++) {
             int m = ORDER[o];
-            if ((g_mask >> m) & 1) pi_chip(p, NAMES[m], 360 + m, m == cur);
+            if (((g_mask >> m) & 1) && !IS_NET(m)) pi_chip(p, NAMES[m], 360 + m, m == cur);
         }
     }
+    if (g_mask & MASK_NET) {   /* network speed: units and arrow colors */
+        p = pi_add(it, &n, max, PI_CHIPS, L"Network", 0, 1);
+        pi_chip(p, L"KB/s, MB/s", 205, g_netBits == 0);
+        pi_chip(p, L"Mbps", 206, g_netBits == 1);
+        p = pi_add(it, &n, max, PI_CHIPS, L"Arrows", 0, 1);
+        for (int k = 0; k < NET_COLOR_N; k++) pi_chip(p, NET_COLORS[k].chip, 210 + k, (int)g_netColors == k);
+    }
+    p = pi_add(it, &n, max, PI_TOGGLE, L"Warning colors for usage", 215, 1);
+    p->on = g_warnUsage != 0;
 
     pi_add(it, &n, max, PI_HEAD, L"Appearance", 0, 0);
     p = pi_add(it, &n, max, PI_SWATCH, L"Theme", 0, 1);
@@ -3143,6 +3331,13 @@ static void menu_classic(void)
     if (g_pioState != PIO_OK && g_pioState != PIO_UNSUPPORTED) AppendMenuW(h, MF_STRING, 320, L"Turn on CPU temperature...");
     AppendMenuW(h, MF_SEPARATOR, 0, NULL);
     AppendMenuW(h, MF_STRING | (g_mode == MODE_BAR ? MF_CHECKED : 0), 310, L"Big labels on taskbar");
+    if (g_mode == MODE_BAR) {   /* each group's numbers in two rows, or side by side */
+        HMENU st = CreatePopupMenu();
+        AppendMenuW(st, MF_STRING | ((g_stacked & STACK_CPU) ? MF_CHECKED : 0), 216, L"CPU");
+        AppendMenuW(st, MF_STRING | ((g_stacked & STACK_GPU) ? MF_CHECKED : 0), 217, L"GPU");
+        if (g_mask & MASK_NET) AppendMenuW(st, MF_STRING | ((g_stacked & STACK_NET) ? MF_CHECKED : 0), 218, L"Network");
+        AppendMenuW(h, MF_POPUP, (UINT_PTR)st, L"Stack in two rows");
+    }
     if (g_mode == MODE_BAR) {
         AppendMenuW(h, MF_STRING, 311, L"Move left");
         AppendMenuW(h, MF_STRING, 312, L"Move right");
@@ -3173,10 +3368,20 @@ static void menu_classic(void)
         int cur = tray_metric();
         for (int o = 0; o < M_N; o++) {
             int m = ORDER[o];
-            if ((g_mask >> m) & 1) AppendMenuW(isub, MF_STRING | (m == cur ? MF_CHECKED : 0), 360 + m, NAMES[m]);
+            if (((g_mask >> m) & 1) && !IS_NET(m)) AppendMenuW(isub, MF_STRING | (m == cur ? MF_CHECKED : 0), 360 + m, NAMES[m]);
         }
         AppendMenuW(h, MF_POPUP, (UINT_PTR)isub, g_mode == MODE_TRAY ? L"Icon shows" : L"Small icon shows");
     }
+    if (g_mask & MASK_NET) {   /* network speed: units and arrow colors */
+        HMENU ns = CreatePopupMenu();
+        AppendMenuW(ns, MF_STRING | (g_netBits == 0 ? MF_CHECKED : 0), 205, L"KB/s and MB/s");
+        AppendMenuW(ns, MF_STRING | (g_netBits == 1 ? MF_CHECKED : 0), 206, L"Kbps and Mbps");
+        AppendMenuW(ns, MF_SEPARATOR, 0, NULL);
+        for (int k = 0; k < NET_COLOR_N; k++)
+            AppendMenuW(ns, MF_STRING | ((int)g_netColors == k ? MF_CHECKED : 0), 210 + k, NET_COLORS[k].name);
+        AppendMenuW(h, MF_POPUP, (UINT_PTR)ns, L"Network speed");
+    }
+    AppendMenuW(h, MF_STRING | (g_warnUsage ? MF_CHECKED : 0), 215, L"Warning colors for usage");
     {   /* Themes and transparency are the modern menu's; here only the switch back to it. */
         HMENU ms = CreatePopupMenu();
         AppendMenuW(ms, MF_STRING | (g_menuStyle == 0 ? MF_CHECKED : 0), CMD_STYLE, L"Modern (themes, transparency)");

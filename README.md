@@ -5,7 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/Fakem1d/TrayVitals?label=latest)](https://github.com/Fakem1d/TrayVitals/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Fakem1d/TrayVitals/total)](https://github.com/Fakem1d/TrayVitals/releases)
 
-**Your PC's vital signs, right on the taskbar.** TrayVitals shows CPU, GPU, RAM, VRAM and SSD usage, temperatures and power next to the clock. You don't need to open anything or keep a window around.
+**Your PC's vital signs, right on the taskbar.** TrayVitals shows CPU, GPU, RAM, VRAM and SSD usage, temperatures, power and network speed next to the clock. You don't need to open anything or keep a window around.
 
 ![TrayVitals labels on the taskbar](screenshots/taskbar-labels.png)
 
@@ -32,12 +32,13 @@ Works on Windows 10 and Windows 11 (64-bit).
 | GPU power (watts) | NVIDIA and AMD Radeon graphics cards (Radeon support is new in 1.10.0) |
 | VRAM usage | Every graphics card |
 | SSD temperature | The drive Windows is installed on |
+| Network download and upload | Every PC (Ethernet and Wi-Fi), in KB/s and MB/s or Kbps and Mbps. Off at first; turn it on in the menu (new in 1.12.0) |
 
 Turn any reading on or off from the menu.
 
 ## Features
 
-- **Big labels on the taskbar.** They fit between your app buttons and the tray, never cover anything, and switch to a smaller layout when space runs short.
+- **Big labels on the taskbar.** They fit between your app buttons and the tray, never cover anything, and switch to a smaller layout when space runs short. Prefer some numbers stacked in two rows? Pick **Stack: CPU, GPU or Network** in the menu, one or more.
 - **Or one small tray icon.** It shows the reading you pick, and hovering it lists all of them.
 - **Any display.** Show the labels on your main monitor or any other one. Align them left, center or right, and nudge them into place.
 - **Your look.** Seven themes (Follow Windows, Light, Dark, Midnight, Graphite, Forest, Sakura), see-through menus and popups, and adjustable label opacity.

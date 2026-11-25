@@ -642,7 +642,7 @@ typedef struct {
     wchar_t icon;
     wchar_t text[400], right[48];
     int nch;
-    PCHIP ch[10];
+    PCHIP ch[16];   /* the Readings grid has one per reading (11) */
 } PITEM;
 typedef struct {
     PITEM it[40];
